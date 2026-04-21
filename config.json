@@ -1,3 +1,4 @@
 {
-    "name": "MasterThesis"
+    "name": "MasterThesis",
+    "route": "/admin/masterthesis"
 }

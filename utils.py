@@ -1,7 +1,7 @@
 import os
 import importlib
 
-def load_modules(folder: str):
+def load_modules(folder: str) -> list:
     """
     Loads the modules from the given folder, returning a list of all imported modules.
     """

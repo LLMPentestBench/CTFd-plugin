@@ -4,6 +4,8 @@ from CTFd import CTFdFlask
 from CTFd.utils.decorators import admins_only, authed_only
 from CTFd.plugins import register_user_page_menu_bar
 
+from . import scaffoldmgr
+
 blueprint = Blueprint(
     "masterthesis",
     __name__,
@@ -16,15 +18,9 @@ blueprint = Blueprint(
 @blueprint.route('/admin/masterthesis')
 @admins_only
 def view_config():
-    # scaffolds = [
-    #     {
-    #         "name": "PentestGPT",
-    #         "status": ScaffoldStatus.STOPPED,
-    #     }
-    # ]
-    # scaffolds2 = map(lambda s: {"name": s.name, "status": s.status().value}, scaffolds)
-    # TODO scaffold status in globals of template?
-    return render_template('masterthesis/admin/config.html', scaffolds=scaffolds, ScaffoldStatus=ScaffoldStatus)
+    scaffolds = scaffoldmgr.get_scaffolds()
+
+    return render_template('masterthesis/admin/config.html', scaffolds=scaffolds, ScaffoldStatus=scaffoldmgr.ScaffoldStatus)
 
 @authed_only
 @blueprint.route('/masterthesis')

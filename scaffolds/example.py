@@ -1,15 +1,17 @@
-# import masterthesis.py
+import logging
+
 from ..scaffoldmgr import Scaffold, ScaffoldStatus
+
+logger = logging.getLogger("masterthesis.scaffolds.example")
 
 class ExampleScaffold(Scaffold):
     def __init__(self):
         super().__init__("Example Scaffold")
-        print("Initializing example scaffold")
     
     def start(self):
-        print(f"Starting scaffold {self.name}")
+        logger.info(f"Starting scaffold {self.name}")
     def stop(self):
-        print(f"Stopping scaffold {self.name}")
+        logger.info(f"Stopping scaffold {self.name}")
     def status(self) -> ScaffoldStatus:
         return ScaffoldStatus.RUNNING
 

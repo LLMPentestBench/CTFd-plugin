@@ -1,0 +1,52 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<div class="jumbotron">
+  <div class="container">
+    <h1>
+      Master Thesis
+    </h1>
+  </div>
+</div>
+
+<div class="container">
+  <div class="row">
+    <div class="col-md-12">
+      <p>Hello, world!</p>
+      <a href="{{ url_for('masterthesis.view_masterthesis') }}">Go to user page.</a>
+      <!-- <img src="/plugins/masterthesis/assets/olaf.png" alt="Placeholder Image" class="img-responsive"> -->
+      
+      <table class="table table-striped border">
+        <thead>
+          <tr>
+            <td><b>Scaffold</b></td>
+            <td><b>Status</b></td>
+            <td class="text-right"><b>Actions</b></td>
+          </tr>
+        </thead>
+        <tbody id="challenge-solves-body">
+          {% for scaffold in scaffolds %}
+            <tr>
+              <td>
+                {{ scaffold.name }}
+              </td>
+              <td>
+                {{ scaffold.status().value }}
+              </td>
+              <td class="text-right">
+                {% if scaffold.status() == ScaffoldStatus.RUNNING %}
+                  <button class="btn btn-secondary float-right">Stop</button>
+                {% else %}
+                  <button class="btn btn-primary float-right">Start</button>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+    </div>
+  </div>
+</div>
+
+{% endblock %}

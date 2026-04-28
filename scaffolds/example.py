@@ -1,5 +1,5 @@
 # import masterthesis.py
-from ..masterthesis import Scaffold, ScaffoldStatus
+from ..scaffoldmgr import Scaffold, ScaffoldStatus
 
 class ExampleScaffold(Scaffold):
     def __init__(self):

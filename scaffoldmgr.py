@@ -6,7 +6,7 @@ import docker
 
 from . import utils
 
-_scaffolds: list['Scaffold'] = []
+_scaffolds: dict[str, 'Scaffold'] = {}
 logger = logging.getLogger("masterthesis.scaffoldmgr")
 
 docker_client = docker.from_env()
@@ -60,14 +60,14 @@ class Scaffold(abc.ABC):
         else:
             return ScaffoldStatus.STOPPED
 
-def _load_scaffolds() -> list['Scaffold']:
-    scaffolds = []
+def _load_scaffolds() -> dict[str, 'Scaffold']:
+    scaffolds = {}
 
     modules = utils.load_modules(os.path.join(os.path.dirname(__file__), "scaffolds"))
     for module in modules:
         try:
             scaffold: 'Scaffold' = module.load()
-            scaffolds.append(scaffold)
+            scaffolds[scaffold.id] = scaffold
             logger.info(f"Loaded module {scaffold.name}")
         except Exception as exc:
             logger.error(f"Exception while loading scaffold {module.__name__}", exc_info=exc)
@@ -75,10 +75,10 @@ def _load_scaffolds() -> list['Scaffold']:
     return scaffolds
 
 def get_scaffolds() -> list['Scaffold']:
-    return _scaffolds
+    return list(_scaffolds.values())
 
 def _get_scaffold(scaffold_id: str) -> 'Scaffold | None':
-    return next((s for s in _scaffolds if s.id == scaffold_id), None)
+    return _scaffolds.get(scaffold_id)
 
 def start_scaffold(scaffold_id: str):
     scaffold = _get_scaffold(scaffold_id)

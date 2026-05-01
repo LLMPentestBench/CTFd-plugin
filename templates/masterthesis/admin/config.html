@@ -26,18 +26,27 @@
         </thead>
         <tbody id="challenge-solves-body">
           {% for scaffold in scaffolds %}
-            <tr>
+            {% set status = scaffold.status() %}
+            <tr scaffold-id="{{ scaffold.id }}">
               <td>
                 {{ scaffold.name }}
               </td>
               <td>
-                {{ scaffold.status().value }}
+                {{ status.value }}
               </td>
               <td class="text-right">
-                {% if scaffold.status() == ScaffoldStatus.RUNNING %}
-                  <button class="btn btn-secondary float-right">Stop</button>
+                {% if status == ScaffoldStatus.RUNNING %}
+                  <button class="btn btn-secondary float-right masterthesis-stop">
+                    Stop
+                  </button>
+                {% elif status == ScaffoldStatus.STOPPED %}
+                  <button class="btn btn-primary float-right masterthesis-start">
+                    Start
+                  </button>
                 {% else %}
-                  <button class="btn btn-primary float-right">Start</button>
+                  <button disabled class="btn btn-primary float-right">
+                    Start
+                  </button>
                 {% endif %}
               </td>
             </tr>
@@ -49,4 +58,8 @@
   </div>
 </div>
 
+{% endblock %}
+
+{% block scripts %}
+  <script defer src="{{ url_for('plugins.masterthesis.assets', path='config.js') }}"></script>
 {% endblock %}

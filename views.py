@@ -1,6 +1,6 @@
 import logging
 
-from flask import Blueprint, jsonify, render_template, current_app, request
+from flask import Blueprint, render_template
 
 from CTFd import CTFdFlask
 from CTFd.utils.decorators import admins_only, authed_only
@@ -32,8 +32,11 @@ def start_scaffold(scaffold_id):
     if not scaffold_id:
         return {"success": False, "error": "Missing scaffold_id"}, 400
 
-    success = scaffoldmgr.start_scaffold(scaffold_id) # TODO pass error onto user
-    return {"success": success}
+    try:
+        scaffoldmgr.start_scaffold(scaffold_id)
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}, 400
 
 @blueprint.route('/api/v1/plugins/masterthesis/scaffold/<scaffold_id>/stop', methods=["POST"])
 @admins_only
@@ -41,8 +44,11 @@ def stop_scaffold(scaffold_id):
     if not scaffold_id:
         return {"success": False, "error": "Missing scaffold_id"}, 400
 
-    success = scaffoldmgr.stop_scaffold(scaffold_id)
-    return {"success": success}
+    try:
+        scaffoldmgr.stop_scaffold(scaffold_id)
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}, 400
 
 @authed_only
 @blueprint.route('/masterthesis')

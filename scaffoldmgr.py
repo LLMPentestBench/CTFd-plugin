@@ -4,8 +4,6 @@ from enum import Enum
 import logging
 import docker
 
-from CTFd.forms import self
-
 from . import utils
 
 _scaffolds: list['Scaffold'] = []
@@ -37,17 +35,17 @@ class Scaffold(abc.ABC):
     def start(self):
         container = self._get_container()
         if not container:
-            raise Exception(f"Container {self.docker_container_name} not found for scaffold {self.name}")
+            raise Exception(f"Container {self.docker_container_name} not found for scaffold {self.id}")
 
-        logger.info(f"Starting scaffold {self.name} using container {self.docker_container_name}")
+        logger.info(f"Starting scaffold {self.id} using container {self.docker_container_name}")
         container.start()
     
     def stop(self):
         container = self._get_container()
         if not container:
-            raise Exception(f"Container {self.docker_container_name} not found for scaffold {self.name}")
+            raise Exception(f"Container {self.docker_container_name} not found for scaffold {self.id}")
 
-        logger.info(f"Stopping scaffold {self.name} using container {self.docker_container_name}")
+        logger.info(f"Stopping scaffold {self.id} using container {self.docker_container_name}")
         container.stop()
     
     def status(self) -> ScaffoldStatus:
@@ -82,31 +80,29 @@ def get_scaffolds() -> list['Scaffold']:
 def _get_scaffold(scaffold_id: str) -> 'Scaffold | None':
     return next((s for s in _scaffolds if s.id == scaffold_id), None)
 
-def start_scaffold(scaffold_id: str) -> bool:
+def start_scaffold(scaffold_id: str):
     scaffold = _get_scaffold(scaffold_id)
     if not scaffold:
         logger.error(f"Scaffold with id {scaffold_id} not found")
-        return False
-    
+        raise Exception(f"Scaffold with id {scaffold_id} not found")
+
     try:
         scaffold.start()
-        return True
     except Exception as exc:
-        logger.error(f"Exception while starting scaffold {scaffold.name}", exc_info=exc)
-        return False
+        logger.error(f"Exception while starting scaffold {scaffold_id}", exc_info=exc)
+        raise
 
-def stop_scaffold(scaffold_id: str) -> bool:
+def stop_scaffold(scaffold_id: str):
     scaffold = _get_scaffold(scaffold_id)
     if not scaffold:
         logger.error(f"Scaffold with id {scaffold_id} not found")
-        return False
+        raise Exception(f"Scaffold with id {scaffold_id} not found")
 
     try:
         scaffold.stop()
-        return True
     except Exception as exc:
-        logger.error(f"Exception while stopping scaffold {scaffold.name}", exc_info=exc)
-        return False
+        logger.error(f"Exception while stopping scaffold {scaffold_id}", exc_info=exc)
+        raise
 
 def load():
     global _scaffolds

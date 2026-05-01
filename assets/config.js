@@ -14,7 +14,7 @@ async function startScaffold(scaffoldId) {
     console.error("Failed to start scaffold:", json.error);
     CTFd.ui.ezq.ezAlert({
       title: "Error",
-      body: `Failed to start scaffold: ${json.error || "Unknown error"}`,
+      body: `Failed to start scaffold ${scaffoldId}: ${json.error || "Unknown error"}`,
       button: "OK",
     });
     return false;
@@ -34,7 +34,7 @@ async function stopScaffold(scaffoldId) {
     console.error("Failed to stop scaffold:", json.error);
     CTFd.ui.ezq.ezAlert({
       title: "Error",
-      body: `Failed to stop scaffold: ${json.error || "Unknown error"}`,
+      body: `Failed to stop scaffold ${scaffoldId}: ${json.error || "Unknown error"}`,
       button: "OK",
     });
     return false;

@@ -26,6 +26,12 @@ def view_config():
 
     return render_template('masterthesis/admin/config.html', scaffolds=scaffolds)
 
+@blueprint.route('/admin/masterthesis/run')
+@admins_only
+def view_run():
+    return render_template('masterthesis/admin/run.html')
+
+
 @blueprint.route('/api/v1/plugins/masterthesis/scaffold/<scaffold_id>/start', methods=["POST"])
 @admins_only
 def start_scaffold(scaffold_id):

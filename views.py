@@ -1,3 +1,4 @@
+import base64
 import logging
 
 from flask import Blueprint, render_template
@@ -77,6 +78,24 @@ def run_challenge(scaffold_id):
     try:
         scaffold.run_challenge()
         return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}, 400
+
+@blueprint.route('/api/v1/plugins/masterthesis/scaffold/<scaffold_id>/logs', methods=["GET"])
+@admins_only
+def get_logs(scaffold_id):
+    if not scaffold_id:
+        return {"success": False, "error": "Missing scaffold_id"}, 400
+    
+    scaffold = scaffoldmgr.get_scaffold(scaffold_id)
+    if not scaffold:
+        return {"success": False, "error": "Invalid scaffold_id"}, 400
+
+    try:
+        # TODO
+        with open(f"/tmp/{scaffold.id}_container.log", "rb") as log_file:
+            logs = log_file.read()
+        return {"success": True, "logs": base64.b64encode(logs).decode('utf-8')}
     except Exception as e:
         return {"success": False, "error": str(e)}, 400
 

@@ -1,6 +1,8 @@
 import os
 import abc
 import logging
+import threading
+
 import docker
 
 from . import utils
@@ -27,34 +29,40 @@ class Scaffold(abc.ABC):
         return docker_client.images.list(name=self._get_image_name()) != []
     
     def run_challenge(self):
-        try:
-            container = docker_client.containers.run(
-                self._get_image_name(),
-                detach=True,
-                tty=True,
-                stdin_open=True,
-                runtime="sysbox-runc",
-            )
-            logger.info(f"Container started: {container.id[:12]}")
+        container = docker_client.containers.run(
+            self._get_image_name(),
+            detach=True,
+            tty=True,
+            stdin_open=True,
+            runtime="sysbox-runc",
+        )
+        logger.info(f"Container started: {container.id[:12]}")
 
-            code, sock = container.exec_run(
-                "bash -c 'echo hello && bash'",
-                stdin=True,
-                tty=True,
-                socket=True,
-            )
+        _, sock = container.exec_run(
+            "bash -c 'echo hello && ls --color=always -alh /'",
+            stdin=True,
+            tty=True,
+            socket=True,
+        )
+
+        def read_container():
             try:
-                while True:
-                    chunk = sock._sock.recv(4096)
-                    if not chunk:
-                        break
-                    print(chunk.decode("utf-8", errors="replace"), end="", flush=True)
-                    # print(repr(chunk)[2:-1].replace('\\n', '\n'), end="", flush=True)
+                with open(f"/tmp/{self.id}_container.log", "wb") as log_file:
+                    while True:
+                        chunk = sock._sock.recv(4096)
+                        if not chunk:
+                            break
+                        # print(chunk.decode("utf-8", errors="replace"), end="", flush=True)
+                        # print(repr(chunk)[2:-1].replace('\\n', '\n'), end="", flush=True)
+                        log_file.write(chunk)
+                        log_file.flush()
             finally:
                 sock.close()
-        finally:
-            container.stop()
-            container.remove()
+                container.stop()
+                container.remove()
+        
+        thread = threading.Thread(target=read_container, daemon=True)
+        thread.start()
 
 def get_scaffolds() -> list['Scaffold']:
     return list(_scaffolds.values())

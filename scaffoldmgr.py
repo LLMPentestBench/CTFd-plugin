@@ -2,10 +2,13 @@ import os
 import abc
 import logging
 import threading
+import asyncio
 
 import docker
 
 from . import utils
+
+CONTAINER_RUN_TIMEOUT = 5 # seconds
 
 _scaffolds: dict[str, 'Scaffold'] = {}
 logger = logging.getLogger("masterthesis.scaffoldmgr")
@@ -29,6 +32,7 @@ class Scaffold(abc.ABC):
         return docker_client.images.list(name=self._get_image_name()) != []
     
     def run_challenge(self):
+        # TODO: Move container creation and exec to inside thread?
         container = docker_client.containers.run(
             self._get_image_name(),
             detach=True,
@@ -39,30 +43,38 @@ class Scaffold(abc.ABC):
         logger.info(f"Container started: {container.id[:12]}")
 
         _, sock = container.exec_run(
-            # "bash -c 'echo hello && sleep 1 && while true; do echo hello; sleep 1; done'",
-            "bash -c 'echo hello && ls --color=always -alh /'",
+            "bash -c 'echo hello && sleep 1 && while true; do echo hello; sleep 1; done'",
+            # "bash -c 'echo hello abc && ls --color=always -alh /'",
             stdin=True,
             tty=True,
             socket=True,
         )
 
-        def read_container():
+        async def read_container():
+            log_file_path = f"/tmp/{self.id}_container.log" # TODO
+
             try:
-                with open(f"/tmp/{self.id}_container.log", "wb") as log_file:
-                    while True:
-                        chunk = sock._sock.recv(4096)
-                        if not chunk:
-                            break
-                        # print(chunk.decode("utf-8", errors="replace"), end="", flush=True)
-                        # print(repr(chunk)[2:-1].replace('\\n', '\n'), end="", flush=True)
-                        log_file.write(chunk)
-                        log_file.flush()
-            finally:
+                event_loop = asyncio.get_event_loop()
+                start_time = event_loop.time()
+
+                try:
+                    async with asyncio.timeout(CONTAINER_RUN_TIMEOUT):
+                        await asyncio.to_thread(_stream_socket_to_file, sock._sock, log_file_path)
+                except asyncio.TimeoutError:
+                    pass # ignore timeout
+
                 sock.close()
-                container.stop()
+                container.stop(timeout=0) # TODO lighter way of stopping, e.g. sending non-kill signal first and fully timing out later if needed
+
+                end_time = event_loop.time()
+                time_taken = end_time - start_time
+                logger.info(f"Container finished in {time_taken:.2f} seconds")
+            except Exception as exc:
+                logger.error(f"Exception while reading container output for {self.id}", exc_info=exc)
+            finally:
                 container.remove()
         
-        thread = threading.Thread(target=read_container, daemon=True)
+        thread = threading.Thread(target=asyncio.run, args=(read_container(),), daemon=True)
         thread.start()
 
 def get_scaffolds() -> list['Scaffold']:
@@ -70,6 +82,15 @@ def get_scaffolds() -> list['Scaffold']:
 
 def get_scaffold(scaffold_id: str) -> 'Scaffold | None':
     return _scaffolds.get(scaffold_id)
+
+def _stream_socket_to_file(sock, file_path):
+    with open(file_path, "wb") as f:
+        while True:
+            data = sock.recv(4096)
+            if not data:
+                break
+            f.write(data)
+            f.flush()
 
 def _load_scaffolds() -> dict[str, 'Scaffold']:
     scaffolds = {}

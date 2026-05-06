@@ -1,8 +1,3 @@
-const CTFD_FETCH_JSON_HEADERS = {
-  "Accept": "application/json",
-  "Content-Type": "application/json"
-};
-
 async function getLogs(scaffoldId) {
   const response = await CTFd.fetch(`/api/v1/plugins/masterthesis/scaffold/${scaffoldId}/logs`, {
     method: "GET",

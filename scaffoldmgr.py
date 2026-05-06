@@ -39,6 +39,7 @@ class Scaffold(abc.ABC):
         logger.info(f"Container started: {container.id[:12]}")
 
         _, sock = container.exec_run(
+            # "bash -c 'echo hello && sleep 1 && while true; do echo hello; sleep 1; done'",
             "bash -c 'echo hello && ls --color=always -alh /'",
             stdin=True,
             tty=True,

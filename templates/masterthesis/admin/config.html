@@ -51,5 +51,7 @@
 {% endblock %}
 
 {% block scripts %}
+  <script defer src="{{ url_for('plugins.masterthesis.assets', path='lib.js') }}"></script>
+  
   <script defer src="{{ url_for('plugins.masterthesis.assets', path='config.js') }}"></script>
 {% endblock %}

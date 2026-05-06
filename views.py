@@ -24,7 +24,7 @@ blueprint = Blueprint(
 def view_config():
     scaffolds = scaffoldmgr.get_scaffolds()
 
-    return render_template('masterthesis/admin/config.html', scaffolds=scaffolds, ScaffoldStatus=scaffoldmgr.ScaffoldStatus)
+    return render_template('masterthesis/admin/config.html', scaffolds=scaffolds)
 
 @blueprint.route('/api/v1/plugins/masterthesis/scaffold/<scaffold_id>/start', methods=["POST"])
 @admins_only
@@ -32,8 +32,12 @@ def start_scaffold(scaffold_id):
     if not scaffold_id:
         return {"success": False, "error": "Missing scaffold_id"}, 400
 
+    scaffold = scaffoldmgr.get_scaffold(scaffold_id)
+    if not scaffold:
+        return {"success": False, "error": "Invalid scaffold_id"}, 400
+
     try:
-        scaffoldmgr.start_scaffold(scaffold_id)
+        scaffold.start()
         return {"success": True}
     except Exception as e:
         return {"success": False, "error": str(e)}, 400
@@ -44,8 +48,28 @@ def stop_scaffold(scaffold_id):
     if not scaffold_id:
         return {"success": False, "error": "Missing scaffold_id"}, 400
 
+    scaffold = scaffoldmgr.get_scaffold(scaffold_id)
+    if not scaffold:
+        return {"success": False, "error": "Invalid scaffold_id"}, 400
+
     try:
-        scaffoldmgr.stop_scaffold(scaffold_id)
+        scaffold.stop()
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}, 400
+
+@blueprint.route('/api/v1/plugins/masterthesis/scaffold/<scaffold_id>/run_challenge', methods=["POST"])
+@admins_only
+def run_challenge(scaffold_id):
+    if not scaffold_id:
+        return {"success": False, "error": "Missing scaffold_id"}, 400
+    
+    scaffold = scaffoldmgr.get_scaffold(scaffold_id)
+    if not scaffold:
+        return {"success": False, "error": "Invalid scaffold_id"}, 400
+
+    try:
+        scaffold.run_challenge()
         return {"success": True}
     except Exception as e:
         return {"success": False, "error": str(e)}, 400

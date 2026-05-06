@@ -1,6 +1,5 @@
 import os
 import abc
-from enum import Enum
 import logging
 import docker
 
@@ -11,11 +10,6 @@ logger = logging.getLogger("masterthesis.scaffoldmgr")
 
 docker_client = docker.from_env()
 
-class ScaffoldStatus(Enum):
-    UNAVAILABLE = "unavailable"
-    STOPPED = "stopped"
-    RUNNING = "running"
-
 class Scaffold(abc.ABC):
     id: str
     name: str
@@ -24,41 +18,49 @@ class Scaffold(abc.ABC):
     def __init__(self, id: str, name: str):
         self.id = id
         self.name = name
-        self.docker_container_name = f"scaffold-{self.id}"  
+        self.docker_container_name = f"scaffold-{self.id}" 
+
+    def _get_image_name(self):
+        return f"mt-baseimage:latest" 
     
-    def _get_container(self):
+    def is_available(self) -> bool:
+        return docker_client.images.list(name=self._get_image_name()) != []
+    
+    def run_challenge(self):
         try:
-            return docker_client.containers.get(self.docker_container_name)
-        except docker.errors.NotFound:
-            return None
+            container = docker_client.containers.run(
+                self._get_image_name(),
+                detach=True,
+                tty=True,
+                stdin_open=True,
+                runtime="sysbox-runc",
+            )
+            logger.info(f"Container started: {container.id[:12]}")
 
-    def start(self):
-        container = self._get_container()
-        if not container:
-            raise Exception(f"Container {self.docker_container_name} not found for scaffold {self.id}")
+            code, sock = container.exec_run(
+                "bash -c 'echo hello && bash'",
+                stdin=True,
+                tty=True,
+                socket=True,
+            )
+            try:
+                while True:
+                    chunk = sock._sock.recv(4096)
+                    if not chunk:
+                        break
+                    print(chunk.decode("utf-8", errors="replace"), end="", flush=True)
+                    # print(repr(chunk)[2:-1].replace('\\n', '\n'), end="", flush=True)
+            finally:
+                sock.close()
+        finally:
+            container.stop()
+            container.remove()
 
-        logger.info(f"Starting scaffold {self.id} using container {self.docker_container_name}")
-        container.start()
-    
-    def stop(self):
-        container = self._get_container()
-        if not container:
-            raise Exception(f"Container {self.docker_container_name} not found for scaffold {self.id}")
+def get_scaffolds() -> list['Scaffold']:
+    return list(_scaffolds.values())
 
-        logger.info(f"Stopping scaffold {self.id} using container {self.docker_container_name}")
-        container.stop()
-    
-    def status(self) -> ScaffoldStatus:
-        container = self._get_container()
-        if not container:
-            return ScaffoldStatus.UNAVAILABLE
-        
-        # container.status is restarting, running, paused or exited
-        # possibly more, see https://www.baeldung.com/ops/docker-container-states
-        if container.status == "running":
-            return ScaffoldStatus.RUNNING
-        else:
-            return ScaffoldStatus.STOPPED
+def get_scaffold(scaffold_id: str) -> 'Scaffold | None':
+    return _scaffolds.get(scaffold_id)
 
 def _load_scaffolds() -> dict[str, 'Scaffold']:
     scaffolds = {}
@@ -73,36 +75,6 @@ def _load_scaffolds() -> dict[str, 'Scaffold']:
             logger.error(f"Exception while loading scaffold {module.__name__}", exc_info=exc)
 
     return scaffolds
-
-def get_scaffolds() -> list['Scaffold']:
-    return list(_scaffolds.values())
-
-def _get_scaffold(scaffold_id: str) -> 'Scaffold | None':
-    return _scaffolds.get(scaffold_id)
-
-def start_scaffold(scaffold_id: str):
-    scaffold = _get_scaffold(scaffold_id)
-    if not scaffold:
-        logger.error(f"Scaffold with id {scaffold_id} not found")
-        raise Exception(f"Scaffold with id {scaffold_id} not found")
-
-    try:
-        scaffold.start()
-    except Exception as exc:
-        logger.error(f"Exception while starting scaffold {scaffold_id}", exc_info=exc)
-        raise
-
-def stop_scaffold(scaffold_id: str):
-    scaffold = _get_scaffold(scaffold_id)
-    if not scaffold:
-        logger.error(f"Scaffold with id {scaffold_id} not found")
-        raise Exception(f"Scaffold with id {scaffold_id} not found")
-
-    try:
-        scaffold.stop()
-    except Exception as exc:
-        logger.error(f"Exception while stopping scaffold {scaffold_id}", exc_info=exc)
-        raise
 
 def load():
     global _scaffolds

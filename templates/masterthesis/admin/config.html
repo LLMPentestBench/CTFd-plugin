@@ -26,28 +26,18 @@
         </thead>
         <tbody id="challenge-solves-body">
           {% for scaffold in scaffolds %}
-            {% set status = scaffold.status() %}
+            {% set available = scaffold.is_available() %}
             <tr scaffold-id="{{ scaffold.id }}">
               <td>
                 {{ scaffold.name }}
               </td>
               <td>
-                {{ status.value }}
+                {{ "Unavailable" if not available else "Available" }}
               </td>
               <td class="text-right">
-                {% if status == ScaffoldStatus.RUNNING %}
-                  <button class="btn btn-secondary float-right masterthesis-stop">
-                    Stop
-                  </button>
-                {% elif status == ScaffoldStatus.STOPPED %}
-                  <button class="btn btn-primary float-right masterthesis-start">
-                    Start
-                  </button>
-                {% else %}
-                  <button disabled class="btn btn-primary float-right">
-                    Start
-                  </button>
-                {% endif %}
+                <button class="btn btn-secondary masterthesis-run-challenge" {% if not available %} disabled {% endif %}>
+                  Run Challenge
+                </button>
               </td>
             </tr>
           {% endfor %}

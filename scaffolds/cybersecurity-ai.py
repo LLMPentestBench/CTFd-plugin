@@ -9,7 +9,7 @@ class CybersecurityAi(Scaffold):
         super().__init__("cybersecurity-ai", "Cybersecurity AI")
 
     def get_image_name(self):
-        return f"ghcr.io/autollmptbenchmarker/agent-cybersecurity-ai:latest"
+        return f"ghcr.io/llmpentestbench/agent-cybersecurity-ai:latest"
 
     def get_command(self) -> str:
         return "source /root/cai_env/bin/activate && cai \"Test https://beginner-chall.tptech.nl/\""

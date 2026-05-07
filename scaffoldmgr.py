@@ -8,7 +8,7 @@ import docker
 
 from . import utils
 
-CONTAINER_RUN_TIMEOUT = 5 # seconds
+CONTAINER_RUN_TIMEOUT = 60 # seconds
 
 _scaffolds: dict[str, 'Scaffold'] = {}
 logger = logging.getLogger("masterthesis.scaffoldmgr")
@@ -25,29 +25,38 @@ class Scaffold(abc.ABC):
         self.name = name
         self.docker_container_name = f"scaffold-{self.id}" 
 
-    def _get_image_name(self):
-        return f"mt-baseimage:latest" 
-    
+    def get_image_name(self):
+        ...
+
+    def get_command(self) -> str:
+        ...
+
     def is_available(self) -> bool:
-        return docker_client.images.list(name=self._get_image_name()) != []
-    
+        return docker_client.images.list(name=self.get_image_name()) != []
+
     def run_challenge(self):
         # TODO: Move container creation and exec to inside thread?
         container = docker_client.containers.run(
-            self._get_image_name(),
+            self.get_image_name(),
             detach=True,
             tty=True,
             stdin_open=True,
             runtime="sysbox-runc",
+            network="mt_proxynet",
         )
         logger.info(f"Container started: {container.id[:12]}")
 
+        # TODO env vars not passing, same as home dir
         _, sock = container.exec_run(
-            "bash -c 'echo hello && sleep 1 && while true; do echo hello; sleep 1; done'",
+            f"bash --login -c '{self.get_command()}'",
             # "bash -c 'echo hello abc && ls --color=always -alh /'",
             stdin=True,
             tty=True,
             socket=True,
+            environment={ # TODO remove
+                "REQUESTS_CA_BUNDLE": "/etc/ssl/certs/ca-certificates.crt",
+                "SSL_CERT_FILE": "/etc/ssl/certs/ca-certificates.crt",
+            }
         )
 
         async def read_container():

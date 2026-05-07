@@ -15,7 +15,16 @@ async function getLogs(scaffoldId) {
     return null;
   }
 
-  return atob(json.logs);
+  return base64ToUint8Array(json.logs);
+}
+
+function base64ToUint8Array(b64) {
+  const binaryString = atob(b64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
 }
 
 var term = new Terminal();

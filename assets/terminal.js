@@ -28,9 +28,16 @@ function base64ToUint8Array(b64) {
 }
 
 var term = new Terminal();
+
+// Allow for unicode wide chars
+const unicode11Addon = new Unicode11Addon.Unicode11Addon();
+term.options.allowProposedApi = true;
+term.loadAddon(unicode11Addon);
+term.unicode.activeVersion = '11';
+
 term.open(document.getElementById('terminal'));
 // term.write('Hello from \x1B[1;3;31mxterm.js\x1B[0m $ ');
-getLogs("example").then(logs => {
+getLogs("cybersecurity-ai").then(logs => {
   if (logs) {
     term.write(logs);
   }

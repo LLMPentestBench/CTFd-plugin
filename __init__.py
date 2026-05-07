@@ -1,1 +1,1 @@
-from .masterthesis import load
+from .llmpentestbench import load

@@ -2,7 +2,7 @@ import logging
 
 from ..scaffoldmgr import Scaffold
 
-logger = logging.getLogger("masterthesis.scaffolds.cybersecurity-ai")
+logger = logging.getLogger("llmpentestbench.scaffolds.cybersecurity-ai")
 
 class CybersecurityAi(Scaffold):
     def __init__(self):

@@ -9,30 +9,30 @@ from CTFd.plugins import register_plugin_assets_directory, register_user_page_me
 
 from . import scaffoldmgr
 
-logger = logging.getLogger("masterthesis.views")
+logger = logging.getLogger("llmpentestbench.views")
 
 blueprint = Blueprint(
-    "masterthesis",
+    "llmpentestbench",
     __name__,
     template_folder="templates",
     static_folder="assets",
-    static_url_path="/plugins/masterthesis/assets",
+    static_url_path="/plugins/llmpentestbench/assets",
 )
 
 
-@blueprint.route('/admin/masterthesis')
+@blueprint.route('/admin/llmpentestbench')
 @admins_only
 def view_config():
     scaffolds = scaffoldmgr.get_scaffolds()
 
-    return render_template('masterthesis/admin/config.html', scaffolds=scaffolds)
+    return render_template('llmpentestbench/admin/config.html', scaffolds=scaffolds)
 
-@blueprint.route('/admin/masterthesis/run')
+@blueprint.route('/admin/llmpentestbench/run')
 @admins_only
 def view_run():
-    return render_template('masterthesis/admin/run.html')
+    return render_template('llmpentestbench/admin/run.html')
 
-@blueprint.route('/api/v1/plugins/masterthesis/scaffold/<scaffold_id>/run_challenge', methods=["POST"])
+@blueprint.route('/api/v1/plugins/llmpentestbench/scaffold/<scaffold_id>/run_challenge', methods=["POST"])
 @admins_only
 def run_challenge(scaffold_id):
     if not scaffold_id:
@@ -48,7 +48,7 @@ def run_challenge(scaffold_id):
     except Exception as e:
         return {"success": False, "error": str(e)}, 400
 
-@blueprint.route('/api/v1/plugins/masterthesis/scaffold/<scaffold_id>/logs', methods=["GET"])
+@blueprint.route('/api/v1/plugins/llmpentestbench/scaffold/<scaffold_id>/logs', methods=["GET"])
 @admins_only
 def get_logs(scaffold_id):
     if not scaffold_id:
@@ -67,13 +67,13 @@ def get_logs(scaffold_id):
         return {"success": False, "error": str(e)}, 400
 
 @authed_only
-@blueprint.route('/masterthesis')
-def view_masterthesis():
-    return render_template('masterthesis/user/view.html')
+@blueprint.route('/llmpentestbench')
+def view_llmpentestbench():
+    return render_template('llmpentestbench/user/view.html')
 
 def load(app: CTFdFlask):
     app.register_blueprint(blueprint)
     register_plugin_assets_directory(app,
-                                     base_path="/plugins/masterthesis/assets",
-                                     endpoint="plugins.masterthesis.assets")
-    register_user_page_menu_bar("Master Thesis", "/masterthesis")
+                                     base_path="/plugins/llmpentestbench/assets",
+                                     endpoint="plugins.llmpentestbench.assets")
+    register_user_page_menu_bar("LLMPentestBench", "/llmpentestbench")

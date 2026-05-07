@@ -2,7 +2,7 @@ import logging
 
 from ..scaffoldmgr import Scaffold
 
-logger = logging.getLogger("masterthesis.scaffolds.example")
+logger = logging.getLogger("llmpentestbench.scaffolds.example")
 
 class ExampleScaffold(Scaffold):
     def __init__(self):

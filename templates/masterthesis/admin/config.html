@@ -4,7 +4,7 @@
 <div class="jumbotron">
   <div class="container">
     <h1>
-      Master Thesis
+      LLMPentestBench
     </h1>
   </div>
 </div>
@@ -13,8 +13,8 @@
   <div class="row">
     <div class="col-md-12">
       <p>Hello, world!</p>
-      <a href="{{ url_for('masterthesis.view_masterthesis') }}">Go to user page.</a>
-      <!-- <img src="/plugins/masterthesis/assets/olaf.png" alt="Placeholder Image" class="img-responsive"> -->
+      <a href="{{ url_for('llmpentestbench.view_llmpentestbench') }}">Go to user page.</a>
+      <!-- <img src="/plugins/llmpentestbench/assets/olaf.png" alt="Placeholder Image" class="img-responsive"> -->
       
       <table class="table table-striped border">
         <thead>
@@ -35,7 +35,7 @@
                 {{ "Unavailable" if not available else "Available" }}
               </td>
               <td class="text-right">
-                <button class="btn btn-secondary masterthesis-run-challenge" {% if not available %} disabled {% endif %}>
+                <button class="btn btn-secondary llmpentestbench-run-challenge" {% if not available %} disabled {% endif %}>
                   Run Challenge
                 </button>
               </td>
@@ -51,7 +51,7 @@
 {% endblock %}
 
 {% block scripts %}
-  <script defer src="{{ url_for('plugins.masterthesis.assets', path='lib.js') }}"></script>
+  <script defer src="{{ url_for('plugins.llmpentestbench.assets', path='lib.js') }}"></script>
   
-  <script defer src="{{ url_for('plugins.masterthesis.assets', path='config.js') }}"></script>
+  <script defer src="{{ url_for('plugins.llmpentestbench.assets', path='config.js') }}"></script>
 {% endblock %}

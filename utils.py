@@ -7,7 +7,7 @@ def load_modules(folder: str) -> list:
     """
     modules = []
     
-    # Extract relative to root, e.g. `CTFd.plugins.masterthesis.scaffolds`
+    # Extract relative to root, e.g. `CTFd.plugins.llmpentestbench.scaffolds`
     package = os.path.relpath(folder).replace("/", ".")
     
     for filename in os.listdir(folder):

@@ -1,5 +1,5 @@
 async function runChallenge(scaffoldId) {
-  const response = await CTFd.fetch(`/api/v1/plugins/masterthesis/scaffold/${scaffoldId}/run_challenge`, {
+  const response = await CTFd.fetch(`/api/v1/plugins/llmpentestbench/scaffold/${scaffoldId}/run_challenge`, {
     method: "POST",
     headers: CTFD_FETCH_JSON_HEADERS,
   });
@@ -19,7 +19,7 @@ async function runChallenge(scaffoldId) {
 }
 
 
-$(".masterthesis-run-challenge").click(async (e) => {
+$(".llmpentestbench-run-challenge").click(async (e) => {
   e.preventDefault();
   let scaffoldId = $(e.currentTarget).closest("tr").attr("scaffold-id");
 

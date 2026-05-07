@@ -1,5 +1,5 @@
 async function getLogs(scaffoldId) {
-  const response = await CTFd.fetch(`/api/v1/plugins/masterthesis/scaffold/${scaffoldId}/logs`, {
+  const response = await CTFd.fetch(`/api/v1/plugins/llmpentestbench/scaffold/${scaffoldId}/logs`, {
     method: "GET",
     headers: CTFD_FETCH_JSON_HEADERS,
   });

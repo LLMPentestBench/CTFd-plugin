@@ -11,7 +11,7 @@ from . import utils
 CONTAINER_RUN_TIMEOUT = 60 # seconds
 
 _scaffolds: dict[str, 'Scaffold'] = {}
-logger = logging.getLogger("masterthesis.scaffoldmgr")
+logger = logging.getLogger("llmpentestbench.scaffoldmgr")
 
 docker_client = docker.from_env()
 

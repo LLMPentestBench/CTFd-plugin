@@ -1,4 +1,4 @@
 {
-    "name": "MasterThesis",
-    "route": "/admin/masterthesis"
+    "name": "LLMPentestBench",
+    "route": "/admin/llmpentestbench"
 }

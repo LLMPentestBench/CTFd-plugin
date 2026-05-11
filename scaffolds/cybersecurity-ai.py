@@ -12,7 +12,7 @@ class CybersecurityAi(Scaffold):
         return f"ghcr.io/llmpentestbench/agent-cybersecurity-ai:latest"
 
     def get_command(self) -> str:
-        return "source /root/cai_env/bin/activate && cai \"Test https://beginner-chall.tptech.nl/\""
+        return "source cai_env/bin/activate && cai \"Test https://beginner-chall.tptech.nl/\""
 
 def load():
     return CybersecurityAi()

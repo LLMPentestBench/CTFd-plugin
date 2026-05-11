@@ -46,17 +46,12 @@ class Scaffold(abc.ABC):
         )
         logger.info(f"Container started: {container.id[:12]}")
 
-        # TODO env vars not passing, same as home dir
         _, sock = container.exec_run(
-            f"bash --login -c '{self.get_command()}'",
-            # "bash -c 'echo hello abc && ls --color=always -alh /'",
+            f"bash -c '{self.get_command()}'",
             stdin=True,
             tty=True,
             socket=True,
-            environment={ # TODO remove
-                "REQUESTS_CA_BUNDLE": "/etc/ssl/certs/ca-certificates.crt",
-                "SSL_CERT_FILE": "/etc/ssl/certs/ca-certificates.crt",
-            }
+            workdir="/root",
         )
 
         async def read_container():
@@ -92,10 +87,10 @@ def get_scaffolds() -> list['Scaffold']:
 def get_scaffold(scaffold_id: str) -> 'Scaffold | None':
     return _scaffolds.get(scaffold_id)
 
-def _stream_socket_to_file(sock, file_path):
+def _stream_socket_to_file(sock, file_path, buffer_size=4096):
     with open(file_path, "wb") as f:
         while True:
-            data = sock.recv(4096)
+            data = sock.recv(buffer_size)
             if not data:
                 break
             f.write(data)

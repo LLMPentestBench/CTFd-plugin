@@ -27,3 +27,10 @@ $(".llmpentestbench-run-challenge").click(async (e) => {
     if (success) location.reload();
   });
 });
+
+$(".llmpentestbench-open-scaffold").click(async (e) => {
+  e.preventDefault();
+  let scaffoldId = $(e.currentTarget).closest("tr").attr("scaffold-id");
+
+  window.open(`/admin/llmpentestbench/run/${scaffoldId}`, "_blank");
+});

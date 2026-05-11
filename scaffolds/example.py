@@ -12,7 +12,7 @@ class ExampleScaffold(Scaffold):
         return f"mt-baseimage:latest"
 
     def get_command(self) -> str:
-        return "echo $NODE_EXTRA_CA_CERTS && echo abc"
+        return "echo $NODE_EXTRA_CA_CERTS && ls --color=auto / && echo abc"
 
 def load():
     return ExampleScaffold()

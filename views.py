@@ -27,10 +27,10 @@ def view_config():
 
     return render_template('llmpentestbench/admin/config.html', scaffolds=scaffolds)
 
-@blueprint.route('/admin/llmpentestbench/run')
+@blueprint.route('/admin/llmpentestbench/run/<scaffold_id>')
 @admins_only
-def view_run():
-    return render_template('llmpentestbench/admin/run.html')
+def view_run(scaffold_id):
+    return render_template('llmpentestbench/admin/run.html', scaffold_id=scaffold_id)
 
 @blueprint.route('/api/v1/plugins/llmpentestbench/scaffold/<scaffold_id>/run_challenge', methods=["POST"])
 @admins_only

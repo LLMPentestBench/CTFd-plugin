@@ -1,3 +1,20 @@
+function loadTerminal(containerElem) {
+  const term = new Terminal({
+    cols: 132,
+    rows: 24,
+  });
+
+  // Allow for unicode wide chars to be displayed properly
+  const unicode11Addon = new Unicode11Addon.Unicode11Addon();
+  term.options.allowProposedApi = true;
+  term.loadAddon(unicode11Addon);
+  term.unicode.activeVersion = '11';
+
+  term.open(containerElem);
+
+  return term;
+}
+
 async function getLogs(scaffoldId) {
   const response = await CTFd.fetch(`/api/v1/plugins/llmpentestbench/scaffold/${scaffoldId}/logs`, {
     method: "GET",
@@ -27,17 +44,12 @@ function base64ToUint8Array(b64) {
   return bytes;
 }
 
-var term = new Terminal();
+const terminalElem = document.getElementById('terminal');
+const scaffoldId = terminalElem.getAttribute('data-scaffold-id');
 
-// Allow for unicode wide chars
-const unicode11Addon = new Unicode11Addon.Unicode11Addon();
-term.options.allowProposedApi = true;
-term.loadAddon(unicode11Addon);
-term.unicode.activeVersion = '11';
+const term = loadTerminal(terminalElem);
 
-term.open(document.getElementById('terminal'));
-// term.write('Hello from \x1B[1;3;31mxterm.js\x1B[0m $ ');
-getLogs("cybersecurity-ai").then(logs => {
+getLogs(scaffoldId).then(logs => {
   if (logs) {
     term.write(logs);
   }

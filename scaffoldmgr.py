@@ -9,6 +9,8 @@ import docker
 from . import utils
 
 CONTAINER_RUN_TIMEOUT = 60 # seconds
+TERMINAL_COLUMNS = 132
+TERMINAL_ROWS = 24
 
 _scaffolds: dict[str, 'Scaffold']
 logger = logging.getLogger("llmpentestbench.scaffoldmgr")
@@ -52,6 +54,11 @@ class Scaffold(abc.ABC):
             tty=True,
             socket=True,
             workdir="/root",
+            environment={ # Run in color with the terminal dimensions used by the frontend
+                "TERM": "xterm-256color",
+                "COLUMNS": str(TERMINAL_COLUMNS),
+                "LINES": str(TERMINAL_ROWS),
+            }
         )
 
         async def read_container():

@@ -47,7 +47,7 @@ class Scaffold(abc.ABC):
         logger.info(f"Container started: {container.id[:12]}")
 
         _, sock = container.exec_run(
-            f"bash -c '{self.get_command()}'",
+            f"bash --login -c '{self.get_command()}'",
             stdin=True,
             tty=True,
             socket=True,

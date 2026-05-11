@@ -10,7 +10,7 @@ from . import utils
 
 CONTAINER_RUN_TIMEOUT = 60 # seconds
 
-_scaffolds: dict[str, 'Scaffold'] = {}
+_scaffolds: dict[str, 'Scaffold']
 logger = logging.getLogger("llmpentestbench.scaffoldmgr")
 
 docker_client = docker.from_env()
@@ -63,7 +63,7 @@ class Scaffold(abc.ABC):
 
                 try:
                     async with asyncio.timeout(CONTAINER_RUN_TIMEOUT):
-                        await asyncio.to_thread(_stream_socket_to_file, sock._sock, log_file_path)
+                        await asyncio.to_thread(utils.stream_socket_to_file, sock._sock, log_file_path)
                 except asyncio.TimeoutError:
                     pass # ignore timeout
 
@@ -86,15 +86,6 @@ def get_scaffolds() -> list['Scaffold']:
 
 def get_scaffold(scaffold_id: str) -> 'Scaffold | None':
     return _scaffolds.get(scaffold_id)
-
-def _stream_socket_to_file(sock, file_path, buffer_size=4096):
-    with open(file_path, "wb") as f:
-        while True:
-            data = sock.recv(buffer_size)
-            if not data:
-                break
-            f.write(data)
-            f.flush()
 
 def _load_scaffolds() -> dict[str, 'Scaffold']:
     scaffolds = {}

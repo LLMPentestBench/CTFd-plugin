@@ -15,26 +15,6 @@ function loadTerminal(containerElem) {
   return term;
 }
 
-async function getLogs(scaffoldId) {
-  const response = await CTFd.fetch(`/api/v1/plugins/llmpentestbench/scaffold/${scaffoldId}/logs`, {
-    method: "GET",
-    headers: CTFD_FETCH_JSON_HEADERS,
-  });
-  const json = await response.json();
-
-  if (!json.success) {
-    console.error("Failed to get logs for scaffold:", json.error);
-    CTFd.ui.ezq.ezAlert({
-      title: "Error",
-      body: `Failed to get logs for scaffold ${scaffoldId}: ${json.error || "Unknown error"}`,
-      button: "OK",
-    });
-    return null;
-  }
-
-  return base64ToUint8Array(json.logs);
-}
-
 function base64ToUint8Array(b64) {
   const binaryString = atob(b64);
   const bytes = new Uint8Array(binaryString.length);
@@ -49,8 +29,9 @@ const scaffoldId = terminalElem.getAttribute('data-scaffold-id');
 
 const term = loadTerminal(terminalElem);
 
-getLogs(scaffoldId).then(logs => {
-  if (logs) {
-    term.write(logs);
-  }
+// TODO error handling
+const source = new EventSource("/api/v1/plugins/llmpentestbench/scaffold/" + scaffoldId + "/log_stream");
+source.addEventListener("log_update", (event) => {
+  const log_data = base64ToUint8Array(event.data);
+  term.write(log_data);
 });

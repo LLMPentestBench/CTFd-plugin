@@ -47,9 +47,10 @@ class Scaffold(abc.ABC):
             network="mt_proxynet",
         )
         logger.info(f"Container started: {container.id[:12]}")
+        command = self.get_command()
 
         _, sock = container.exec_run(
-            f"bash --login -c '{self.get_command()}'",
+            f"bash --login -c '{command}'",
             stdin=True,
             tty=True,
             socket=True,
@@ -83,7 +84,7 @@ class Scaffold(abc.ABC):
             except Exception as exc:
                 logger.error(f"Exception while reading container output for {self.id}", exc_info=exc)
             finally:
-                container.remove()
+                container.remove(force=True)
         
         thread = threading.Thread(target=asyncio.run, args=(read_container(),), daemon=True)
         thread.start()

@@ -1,7 +1,7 @@
 import base64
 import logging
 
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, request, Response, stream_with_context
 
 from CTFd import CTFdFlask
 from CTFd.utils.decorators import admins_only, authed_only
@@ -48,23 +48,23 @@ def run_challenge(scaffold_id):
     except Exception as e:
         return {"success": False, "error": str(e)}, 400
 
-@blueprint.route('/api/v1/plugins/llmpentestbench/scaffold/<scaffold_id>/logs', methods=["GET"])
+@blueprint.route('/api/v1/plugins/llmpentestbench/scaffold/<scaffold_id>/log_stream', methods=["GET"])
 @admins_only
-def get_logs(scaffold_id):
-    if not scaffold_id:
-        return {"success": False, "error": "Missing scaffold_id"}, 400
-    
-    scaffold = scaffoldmgr.get_scaffold(scaffold_id)
-    if not scaffold:
-        return {"success": False, "error": "Invalid scaffold_id"}, 400
+def get_logs_stream(scaffold_id):
+    @stream_with_context
+    def gen():
+        with open(f"/tmp/{scaffold_id}_container.log", "rb") as log_file:
+            while True:
+                # TODO look into better file wathcing (watchdog, inotify) or select(ors)
+                data = log_file.read(2048)
+                data_encoded = base64.b64encode(data).decode('utf-8')
+                if data:
+                    yield f"event: log_update\ndata: {data_encoded}\n\n"
+                else:
+                    from time import sleep
+                    sleep(0.1)
 
-    try:
-        # TODO
-        with open(f"/tmp/{scaffold.id}_container.log", "rb") as log_file:
-            logs = log_file.read()
-        return {"success": True, "logs": base64.b64encode(logs).decode('utf-8')}
-    except Exception as e:
-        return {"success": False, "error": str(e)}, 400
+    return Response(gen(), mimetype="text/event-stream")
 
 @authed_only
 @blueprint.route('/llmpentestbench')

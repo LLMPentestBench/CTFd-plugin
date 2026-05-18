@@ -4,10 +4,12 @@ import logging
 from flask import Blueprint, render_template, request, Response, stream_with_context
 
 from CTFd import CTFdFlask
+from CTFd.models import Challenges
 from CTFd.utils.decorators import admins_only, authed_only
 from CTFd.plugins import register_plugin_assets_directory, register_user_page_menu_bar
 
-from . import scaffoldmgr
+from . import scaffoldmgr, runmgr
+from .models import AgentRun
 
 logger = logging.getLogger("llmpentestbench.views")
 
@@ -24,13 +26,24 @@ blueprint = Blueprint(
 @admins_only
 def view_config():
     scaffolds = scaffoldmgr.get_scaffolds()
+    runs = AgentRun.query.order_by(AgentRun.start_time.desc()).all()
 
-    return render_template('llmpentestbench/admin/config.html', scaffolds=scaffolds)
+    return render_template('llmpentestbench/admin/config.html', scaffolds=scaffolds, runs=runs)
 
-@blueprint.route('/admin/llmpentestbench/run/<scaffold_id>')
+@blueprint.route('/admin/llmpentestbench/run/<run_id>')
 @admins_only
-def view_run(scaffold_id):
-    return render_template('llmpentestbench/admin/run.html', scaffold_id=scaffold_id)
+def view_run(run_id):
+    run = AgentRun.query.filter_by(id=run_id).first_or_404()
+    scaffold = scaffoldmgr.get_scaffold(run.scaffold_id)
+    challenge = Challenges.query.filter_by(id=run.challenge_id).first()
+
+    return render_template('llmpentestbench/admin/run.html',
+                           run_id=run.id,
+                           scaffold_id=run.scaffold_id,
+                           scaffold_name=scaffold.name,
+                           challenge_id=run.challenge_id,
+                           challenge_name=challenge.name,
+                           finished=run.is_finished())
 
 @blueprint.route('/api/v1/plugins/llmpentestbench/scaffold/<scaffold_id>/run_challenge', methods=["POST"])
 @admins_only
@@ -43,19 +56,22 @@ def run_challenge(scaffold_id):
         return {"success": False, "error": "Invalid scaffold_id"}, 400
 
     try:
-        scaffold.run_challenge()
+        runmgr.start_run(scaffold, challenge_id="1") # TODO challenge_id
         return {"success": True}
     except Exception as e:
         return {"success": False, "error": str(e)}, 400
 
-@blueprint.route('/api/v1/plugins/llmpentestbench/scaffold/<scaffold_id>/log_stream', methods=["GET"])
+@blueprint.route('/api/v1/plugins/llmpentestbench/run/<run_id>/log_stream', methods=["GET"])
 @admins_only
-def get_logs_stream(scaffold_id):
+def get_logs_stream(run_id):
+    run = AgentRun.query.filter_by(id=run_id).first_or_404()
+
     @stream_with_context
     def gen():
-        with open(f"/tmp/{scaffold_id}_container.log", "rb") as log_file:
+        with open(f"{run.get_folder()}/output.log", "rb") as log_file:
             while True:
                 # TODO look into better file wathcing (watchdog, inotify) or select(ors)
+                # TODO also stop when run is finished
                 data = log_file.read(2048)
                 data_encoded = base64.b64encode(data).decode('utf-8')
                 if data:

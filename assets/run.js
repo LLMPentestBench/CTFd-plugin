@@ -25,12 +25,12 @@ function base64ToUint8Array(b64) {
 }
 
 const terminalElem = document.getElementById('terminal');
-const scaffoldId = terminalElem.getAttribute('data-scaffold-id');
+const runId = terminalElem.getAttribute('data-run-id');
 
 const term = loadTerminal(terminalElem);
 
 // TODO error handling
-const source = new EventSource("/api/v1/plugins/llmpentestbench/scaffold/" + scaffoldId + "/log_stream");
+const source = new EventSource("/api/v1/plugins/llmpentestbench/run/" + runId + "/log_stream");
 source.addEventListener("log_update", (event) => {
   const log_data = base64ToUint8Array(event.data);
   term.write(log_data);

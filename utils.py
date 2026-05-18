@@ -1,6 +1,10 @@
 import os
 import importlib
 
+import docker
+
+docker_client: docker.DockerClient = docker.from_env()
+
 def load_modules(folder: str) -> list:
     """
     Loads the modules from the given folder, returning a list of all imported modules.

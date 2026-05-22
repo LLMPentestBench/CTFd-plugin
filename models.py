@@ -10,6 +10,7 @@ if not os.path.exists(AGENT_RUNS_FOLDER):
     os.makedirs(AGENT_RUNS_FOLDER)
 
 class AgentRunStatus(enum.Enum):
+    # TODO int values for better version control. also adapt config.html cause it displays string values currently
     INITIATING = "initiating"
     RUNNING = "running"
     FINISHED = "finished"

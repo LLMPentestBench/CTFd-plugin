@@ -41,7 +41,7 @@ def start_run(scaffold: Scaffold, challenge_id):
             runtime=DOCKER_RUNTIME,
             network=DOCKER_NETWORK,
             name=container_name,
-            remove=True,
+            remove=True, # TODO remove and do manual cleanup, see also _monitor_run_container finally block
         )
         agent_run.logger.info(f"Container ({container.id[:12]}) started")
         
@@ -98,3 +98,7 @@ async def _monitor_run_container(container, sock, run_id):
 
         agent_run.logger.info(f"Container finished in {time_taken:.2f} seconds")
         # TODO when CTFd crashes, container remains but it shouldnt
+
+def load():
+    # TODO cleanup
+    pass

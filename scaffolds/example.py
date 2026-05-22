@@ -12,7 +12,7 @@ class ExampleScaffold(Scaffold):
         return f"mt-baseimage:latest"
 
     def get_command(self) -> str:
-        return "while true; do echo \"Hello, World!\"; sleep 5; done"
+        return "echo Hello World! && sleep 5 && echo Goodbye World!"
 
 def load():
     return ExampleScaffold()

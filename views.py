@@ -59,6 +59,7 @@ def run_challenge(scaffold_id):
         runmgr.start_run(scaffold, challenge_id="1") # TODO challenge_id
         return {"success": True}
     except Exception as e:
+        logger.error(f"Error starting run for scaffold {scaffold_id}", exc_info=e)
         return {"success": False, "error": str(e)}, 400
 
 @blueprint.route('/api/v1/plugins/llmpentestbench/run/<run_id>/log_stream', methods=["GET"])

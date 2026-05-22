@@ -1,7 +1,10 @@
+import functools
 import os
 import importlib
+import inspect
 
 import docker
+import flask
 
 docker_client: docker.DockerClient = docker.from_env()
 
@@ -35,3 +38,23 @@ def stream_socket_to_file(sock, file_path, buffer_size=4096):
                 break
             f.write(data)
             f.flush()
+
+def wrap_app_context(func):
+    """
+    Decorator to wrap a function in the Flask app context, allowing it to use the DB session and other Flask features.
+    Works for both sync and async functions.
+    """
+    current_app = flask.current_app._get_current_object()
+
+    if inspect.iscoroutinefunction(func):
+        @functools.wraps(func)
+        async def wrapper(*args, **kwargs):
+            with current_app.app_context():
+                return await func(*args, **kwargs)
+        return wrapper
+    else:
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            with current_app.app_context():
+                return func(*args, **kwargs)
+        return wrapper

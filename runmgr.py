@@ -6,7 +6,7 @@ import asyncio
 from CTFd.models import db
 
 from . import utils
-from .models import AgentRun, AgentRunStatus
+from .models import AGENT_RUN_HEARTBEAT_INTERVAL, AgentRun, AgentRunStatus
 from .scaffoldmgr import Scaffold
 from .utils import docker_client
 
@@ -66,6 +66,17 @@ def start_run(scaffold: Scaffold, challenge_id):
         agent_run.mark_errored()
         raise exc
 
+async def _send_heartbeats(agent_run_id, interval=AGENT_RUN_HEARTBEAT_INTERVAL):
+    while True:
+        agent_run = AgentRun.query.get(agent_run_id)
+        if agent_run is None or agent_run.is_finished():
+            break
+
+        agent_run.heartbeat()
+        agent_run.logger.debug(f"Sent heartbeat")
+
+        await asyncio.sleep(interval)
+
 @utils.wrap_app_context
 async def _monitor_run_container(container, sock, run_id):
     agent_run = AgentRun.query.get(run_id)
@@ -75,14 +86,18 @@ async def _monitor_run_container(container, sock, run_id):
     log_file_path = f"{run_folder}/output.log"
 
     try:
-        try:
-            # TODO could set socket in timeout mode (e.g. 1s), and keep reading until X seconds passed, to reduce to only 1 thread instead of 2
-            async with asyncio.timeout(CONTAINER_RUN_TIMEOUT):
-                agent_run.logger.info(f"Start monitoring container")
+        # Wait for container to finish or timeout to expire
+        monitoring_task = asyncio.wait([
+            asyncio.create_task(asyncio.sleep(CONTAINER_RUN_TIMEOUT)),
+            asyncio.create_task(asyncio.to_thread(utils.stream_socket_to_file, sock._sock, log_file_path))
+        ], return_when=asyncio.FIRST_COMPLETED)
 
-                await asyncio.to_thread(utils.stream_socket_to_file, sock._sock, log_file_path)
-        except asyncio.TimeoutError:
-            pass # ignore timeout
+        # Send heartbeats for zombie run detection
+        heartbeat_task = asyncio.create_task(_send_heartbeats(run_id))
+
+        await monitoring_task
+        
+        heartbeat_task.cancel()
         
         agent_run.logger.info(f"Finished monitoring container")
 

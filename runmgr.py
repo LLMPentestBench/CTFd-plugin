@@ -86,19 +86,27 @@ async def _monitor_run_container(container, sock, run_id):
     log_file_path = f"{run_folder}/output.log"
 
     try:
-        # Wait for container to finish or timeout to expire
-        monitoring_task = asyncio.wait([
-            asyncio.create_task(asyncio.sleep(CONTAINER_RUN_TIMEOUT)),
-            asyncio.create_task(asyncio.to_thread(utils.stream_socket_to_file, sock._sock, log_file_path))
-        ], return_when=asyncio.FIRST_COMPLETED)
-
+        timeout_task = asyncio.create_task(asyncio.sleep(CONTAINER_RUN_TIMEOUT))
+        stream_task = asyncio.create_task(asyncio.to_thread(utils.stream_socket_to_file, sock._sock, log_file_path))
         # Send heartbeats for zombie run detection
         heartbeat_task = asyncio.create_task(_send_heartbeats(run_id))
 
-        await monitoring_task
-        
-        heartbeat_task.cancel()
-        
+        try:
+            # Wait for container to finish or timeout to expire
+            await asyncio.wait(
+                [timeout_task, stream_task],
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+        finally:
+            timeout_task.cancel()
+            stream_task.cancel()
+            heartbeat_task.cancel()
+
+            await asyncio.gather(
+                heartbeat_task, timeout_task, stream_task,
+                return_exceptions=True,
+            )
+
         agent_run.logger.info(f"Finished monitoring container")
 
         sock.close()

@@ -87,7 +87,9 @@ async def _monitor_run_container(container, sock, run_id):
 
     try:
         timeout_task = asyncio.create_task(asyncio.sleep(CONTAINER_RUN_TIMEOUT))
-        stream_task = asyncio.create_task(asyncio.to_thread(utils.stream_socket_to_file, sock._sock, log_file_path))
+        stream_task = asyncio.create_task(
+            asyncio.to_thread(utils.stream_socket_to_file, sock._sock, log_file_path)
+        )
         # Send heartbeats for zombie run detection
         heartbeat_task = asyncio.create_task(_send_heartbeats(run_id))
 
@@ -98,6 +100,7 @@ async def _monitor_run_container(container, sock, run_id):
                 return_when=asyncio.FIRST_COMPLETED,
             )
         finally:
+            # Cancel all tasks and wait for them to finish
             timeout_task.cancel()
             stream_task.cancel()
             heartbeat_task.cancel()

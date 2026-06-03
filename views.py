@@ -1,10 +1,9 @@
 import base64
 import logging
 
-from flask import Blueprint, render_template, request, Response, stream_with_context
+from flask import Blueprint, render_template, Response, stream_with_context
 
 from CTFd import CTFdFlask
-from CTFd.models import Challenges
 from CTFd.utils.decorators import admins_only, authed_only
 from CTFd.plugins import register_plugin_assets_directory, register_user_page_menu_bar
 
@@ -34,23 +33,12 @@ def view_config():
 @admins_only
 def view_run(run_id):
     run = AgentRun.query.filter_by(id=run_id).first_or_404()
-    scaffold = scaffoldmgr.get_scaffold(run.scaffold_id)
-    challenge = Challenges.query.filter_by(id=run.challenge_id).first()
 
-    return render_template('llmpentestbench/admin/run.html',
-                           run_id=run.id,
-                           scaffold_id=run.scaffold_id,
-                           scaffold_name=scaffold.name,
-                           challenge_id=run.challenge_id,
-                           challenge_name=challenge.name,
-                           finished=run.is_finished())
+    return render_template('llmpentestbench/admin/run.html', run=run)
 
 @blueprint.route('/api/v1/plugins/llmpentestbench/scaffold/<scaffold_id>/run_challenge', methods=["POST"])
 @admins_only
 def run_challenge(scaffold_id):
-    if not scaffold_id:
-        return {"success": False, "error": "Missing scaffold_id"}, 400
-    
     scaffold = scaffoldmgr.get_scaffold(scaffold_id)
     if not scaffold:
         return {"success": False, "error": "Invalid scaffold_id"}, 400

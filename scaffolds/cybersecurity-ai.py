@@ -13,6 +13,13 @@ class CybersecurityAi(Scaffold):
 
     def get_command(self) -> str:
         return "cai \"Test https://beginner-chall.tptech.nl/\""
+        # TODO look into src/cai/sdk/agents/run.py L407 run_streamed
 
 def load():
     return CybersecurityAi()
+
+# from cai.agents.one_tool import one_tool_agent
+# from cai.sdk.agents import run
+
+# res = run.Runner.run_sync(one_tool_agent, "Test https://beginner-chall.tptech.nl/")
+# out = res.final_output_as(str)

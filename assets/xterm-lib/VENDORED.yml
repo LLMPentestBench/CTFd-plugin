@@ -1,0 +1,24 @@
+name: xterm-lib
+description: Vendored browser assets for LLMPentestBench terminal UI.
+upstream:
+  xterm:
+    package: @xterm/xterm
+    version: 6.0.0
+    file: xterm.js
+    url: https://cdn.jsdelivr.net/npm/@xterm/xterm@6.0.0/lib/xterm.js
+    sha256: 14903579ff54664cd72f8e8699e6961a6272c21863ec1c3b118cdc8af5d4a972
+  xterm_css:
+    package: @xterm/xterm
+    version: 6.0.0
+    file: xterm.css
+    url: https://cdn.jsdelivr.net/npm/@xterm/xterm@6.0.0/css/xterm.css
+    sha256: 854a7c0fb70e8b1a083c16797ab827299fb18744f5ad34f227b48337e33293c6
+  addon_unicode11:
+    package: @xterm/addon-unicode11
+    version: 0.9.0
+    file: addon-unicode11.js
+    url: https://cdn.jsdelivr.net/npm/@xterm/addon-unicode11@0.9.0/lib/addon-unicode11.js
+    sha256: 72353b5178e1a7382716df1cfedf8ab070eea655d38995bb9f4f284fe56e2f2b
+license: MIT
+updated_utc: 2026-06-09
+update_script: CTFd/plugins/LLMPentestBench/scripts/update-xterm-lib.sh

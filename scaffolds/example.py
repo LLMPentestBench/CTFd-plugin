@@ -9,7 +9,7 @@ class ExampleScaffold(Scaffold):
         super().__init__("example", "Example Scaffold")
 
     def get_image_name(self):
-        return f"mt-baseimage:latest"
+        return f"llmptb-baseimage:latest"
 
     def get_command(self) -> str:
         return "echo Hello World! && sleep 5 && echo Goodbye World!"

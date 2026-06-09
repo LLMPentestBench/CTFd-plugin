@@ -11,7 +11,7 @@ from .scaffoldmgr import Scaffold
 from .utils import docker_client
 
 DOCKER_RUNTIME = "sysbox-runc"
-DOCKER_NETWORK = "mt_proxynet"
+DOCKER_NETWORK = "llmptb_proxynet"
 
 CONTAINER_RUN_TIMEOUT = 60 # seconds
 TERMINAL_COLUMNS = 132

@@ -6,6 +6,8 @@ import inspect
 import docker
 import flask
 
+from CTFd.plugins.challenges.logic import challenge_attempt_any
+
 docker_client: docker.DockerClient = docker.from_env()
 
 def load_modules(folder: str) -> list:
@@ -58,3 +60,9 @@ def wrap_app_context(func):
             with current_app.app_context():
                 return func(*args, **kwargs)
         return wrapper
+
+def check_flag(challenge, flag) -> bool:
+    """
+    Checks if the given flag is correct for the given challenge by using the same logic as the challenge attempt endpoints.
+    """
+    return challenge_attempt_any(flag, challenge, challenge.flags).status == "correct"

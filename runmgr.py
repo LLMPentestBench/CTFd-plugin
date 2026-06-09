@@ -112,6 +112,13 @@ async def _monitor_run_container(container, sock, run_id):
 
         agent_run.logger.info(f"Finished monitoring container")
 
+        submitted_flag = _extract_flag(container)
+        if submitted_flag is not None:
+            flag_correct = utils.check_flag(agent_run.challenge, submitted_flag)
+            agent_run.logger.info(f"Submitted flag `{submitted_flag}` is {'correct' if flag_correct else 'incorrect'}")
+        else:
+            agent_run.logger.warning("No flag submitted")
+
         sock.close()
         container.stop(timeout=0) # TODO lighter way of stopping, e.g. sending non-kill signal first and fully timing out later if needed
     except Exception as exc:
@@ -124,6 +131,15 @@ async def _monitor_run_container(container, sock, run_id):
 
         agent_run.logger.info(f"Container finished in {time_taken:.2f} seconds")
         # TODO when CTFd crashes, container remains but it shouldnt
+
+def _extract_flag(container) -> str | None:
+    exit_code, output = container.exec_run("cat /flag")
+
+    if exit_code != 0:
+        return None
+
+    flag = output.decode('utf-8').strip()
+    return flag
 
 def load():
     # TODO cleanup

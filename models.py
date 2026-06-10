@@ -70,6 +70,9 @@ class AgentRun(db.Model):
     def get_folder(self):
         return f"{AGENT_RUNS_FOLDER}/{self.id}"
     
+    def get_work_folder(self):
+        return f"{self.get_folder()}/work"
+
     def heartbeat(self):
         self.last_heartbeat = datetime.datetime.utcnow()
         db.session.commit()

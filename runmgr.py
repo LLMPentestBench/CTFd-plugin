@@ -1,3 +1,4 @@
+import json
 import os
 import logging
 import threading
@@ -29,10 +30,14 @@ def start_run(scaffold: Scaffold, challenge_id):
     agent_run.logger.info(f"Starting run with scaffold `{scaffold.id}` for challenge {challenge_id}")
     
     try:
-        os.mkdir(agent_run.get_folder())
+        # Populate run folder with challenge details
+        run_folder = agent_run.get_folder()
+        run_work_folder = agent_run.get_work_folder()
+        os.mkdir(run_folder)
+        os.mkdir(run_work_folder)
+        _write_challenge_details(run_work_folder, agent_run.challenge)
 
         container_name = "llmptb_" + scaffold.id + "_run_" + str(run_id)
-
         container = docker_client.containers.run(
             scaffold.get_image_name(),
             detach=True,
@@ -41,10 +46,16 @@ def start_run(scaffold: Scaffold, challenge_id):
             runtime=DOCKER_RUNTIME,
             network=DOCKER_NETWORK,
             name=container_name,
+            volumes={
+                run_work_folder: { # TODO mount subfolder instead
+                    "bind": "/llmptb",
+                    "mode": "rw",
+                }
+            },
             remove=True, # TODO remove and do manual cleanup, see also _monitor_run_container finally block
         )
         agent_run.logger.info(f"Container ({container.id[:12]}) started")
-        
+
         command = scaffold.get_command()
         _, sock = container.exec_run(
             f"bash --login -c '{command}'",
@@ -64,7 +75,7 @@ def start_run(scaffold: Scaffold, challenge_id):
     except Exception as exc:
         agent_run.logger.error(f"Exception while starting run", exc_info=exc)
         agent_run.mark_errored()
-        raise exc
+        raise Exception(f"Failed to start run {run_id} for scaffold {scaffold.id} and challenge {challenge_id}") from exc
 
 async def _send_heartbeats(agent_run_id, interval=AGENT_RUN_HEARTBEAT_INTERVAL):
     while True:
@@ -112,7 +123,7 @@ async def _monitor_run_container(container, sock, run_id):
 
         agent_run.logger.info(f"Finished monitoring container")
 
-        submitted_flag = _extract_flag(container)
+        submitted_flag = _extract_submitted_flag(agent_run.get_work_folder() + "/flag.txt")
         if submitted_flag is not None:
             flag_correct = utils.check_flag(agent_run.challenge, submitted_flag)
             agent_run.logger.info(f"Submitted flag `{submitted_flag}` is {'correct' if flag_correct else 'incorrect'}")
@@ -132,14 +143,32 @@ async def _monitor_run_container(container, sock, run_id):
         agent_run.logger.info(f"Container finished in {time_taken:.2f} seconds")
         # TODO when CTFd crashes, container remains but it shouldnt
 
-def _extract_flag(container) -> str | None:
-    exit_code, output = container.exec_run("cat /flag")
+def _write_challenge_details(folder, challenge) -> str:
+    """
+    Write the (limited) details of the CTFd challenge to a JSON file for the scaffold.
+    """
+    name = challenge.name
+    description = challenge.description
+    category = challenge.category
+    connection_info = challenge.connection_info
+    # TODO chall files
+    
+    with open(f"{folder}/challenge.json", "w") as f:
+        json.dump({
+            "name": name,
+            "description": description,
+            "category": category,
+            "connection_info": connection_info
+        }, f, indent=4)
 
-    if exit_code != 0:
-        return None
+def _extract_submitted_flag(file_path) -> str | None:
+    if os.path.exists(file_path):
+        with open(file_path, "r") as f:
+            submitted_flag = f.read().strip()
+    else:
+        submitted_flag = None
 
-    flag = output.decode('utf-8').strip()
-    return flag
+    return submitted_flag
 
 def load():
     # TODO cleanup

@@ -36,6 +36,18 @@ def view_run(run_id):
 
     return render_template('llmpentestbench/admin/run.html', run=run)
 
+@blueprint.route('/api/v1/plugins/llmpentestbench/run/<run_id>/stop', methods=["POST"])
+@admins_only
+def stop_run(run_id):
+    run = AgentRun.query.filter_by(id=run_id).first_or_404()
+
+    try:
+        runmgr.stop_run(run)
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Error stopping run {run_id}", exc_info=e)
+        return {"success": False, "error": str(e)}, 400
+
 @blueprint.route('/api/v1/plugins/llmpentestbench/scaffold/<scaffold_id>/run_challenge', methods=["POST"])
 @admins_only
 def run_challenge(scaffold_id):

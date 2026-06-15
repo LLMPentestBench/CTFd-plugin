@@ -77,6 +77,9 @@ def start_run(scaffold: Scaffold, challenge_id):
         agent_run.mark_errored()
         raise Exception(f"Failed to start run {run_id} for scaffold {scaffold.id} and challenge {challenge_id}") from exc
 
+def stop_run(agent_run: AgentRun):
+    ... # TODO
+
 async def _send_heartbeats(agent_run_id, interval=AGENT_RUN_HEARTBEAT_INTERVAL):
     while True:
         agent_run = AgentRun.query.get(agent_run_id)

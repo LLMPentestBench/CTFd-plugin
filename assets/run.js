@@ -1,3 +1,29 @@
+async function stopRun() {
+  try {
+    const response = await CTFd.fetch(`/api/v1/plugins/llmpentestbench/run/${RUN_ID}/stop`, {
+      method: "POST",
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const json = await response.json();
+    if (!json.success) {
+      throw new Error(json.error || "Unknown error");
+    }
+
+    window.location.reload();
+  } catch (error) {
+    console.error("Failed to stop run:", error);
+    CTFd.ui.ezq.ezAlert({
+      title: "Error",
+      body: `Failed to stop run ${RUN_ID}: ${error.message}`,
+      button: "OK",
+    });
+    return;
+  }
+}
+
 function loadTerminal(containerElem) {
   const term = new Terminal({
     cols: 132,
@@ -24,6 +50,21 @@ function base64ToUint8Array(b64) {
   return bytes;
 }
 
+// UI interactions
+$("#llmpentestbench-stop-run").click(async (e) => {
+  if (RUN_FINISHED) {
+    return;
+  }
+  e.preventDefault();
+  CTFd.ui.ezq.ezQuery({
+    title: "Stop Run",
+    body: "Are you sure you want to stop this run?",
+    success: stopRun,
+  });
+});
+
+
+// Load terminal and initiate log streaming
 const terminalElem = document.getElementById('terminal');
 const runId = terminalElem.getAttribute('data-run-id');
 

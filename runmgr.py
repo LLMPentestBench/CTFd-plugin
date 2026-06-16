@@ -14,7 +14,7 @@ from .utils import docker_client
 DOCKER_RUNTIME = "sysbox-runc"
 DOCKER_NETWORK = "llmptb_proxynet"
 
-CONTAINER_RUN_TIMEOUT = 60 # seconds
+CONTAINER_RUN_TIMEOUT = 180 # seconds
 TERMINAL_COLUMNS = 132
 TERMINAL_ROWS = 24
 

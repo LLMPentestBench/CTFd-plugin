@@ -28,6 +28,9 @@ function loadTerminal(containerElem) {
   const term = new Terminal({
     cols: 132,
     rows: 24,
+    disableStdin: true,
+    cursorStyle: "bar",
+    cursorBlink: true,
   });
 
   // Allow for unicode wide chars to be displayed properly
@@ -37,6 +40,11 @@ function loadTerminal(containerElem) {
   term.unicode.activeVersion = '11';
 
   term.open(containerElem);
+
+  // Hack to prevent terminal from taking focus, as it's read-only anyway, prevents keybinds like ctrl+r for reload otherwise
+  containerElem.addEventListener('focus', (e) => {
+    e.target.blur();
+  }, true);
 
   return term;
 }

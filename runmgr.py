@@ -5,6 +5,7 @@ import threading
 import asyncio
 
 from CTFd.models import db
+from CTFd.utils.uploads import get_uploader
 
 from . import utils
 from .models import AGENT_RUN_HEARTBEAT_INTERVAL, AgentRun, AgentRunStatus
@@ -154,14 +155,33 @@ def _write_challenge_details(folder, challenge) -> str:
     description = challenge.description
     category = challenge.category
     connection_info = challenge.connection_info
-    # TODO chall files
+
+    # Get files from file storage (local / S3), and write to challenge files folder
+    files_folder = f"{folder}/files"
+    if challenge.files:
+        os.mkdir(files_folder)
+    
+    uploader = get_uploader()
+    file_names = []
+    for file in challenge.files:
+        file_name = file.location.split("/")[-1]
+
+        # Open file stream and write to the location in chunks
+        with uploader.open(file.location, "rb") as f: 
+            file_path = f"{files_folder}/{file_name}"
+            with open(file_path, "wb") as dst:
+                while chunk := f.read(1024*1024): # 1MB chunks
+                    dst.write(chunk)
+        
+        file_names.append(file_name)
     
     with open(f"{folder}/challenge.json", "w") as f:
         json.dump({
             "name": name,
             "description": description,
             "category": category,
-            "connection_info": connection_info
+            "connection_info": connection_info,
+            "files": file_names,
         }, f, indent=4)
 
 def _extract_submitted_flag(file_path) -> str | None:

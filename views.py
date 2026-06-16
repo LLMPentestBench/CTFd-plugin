@@ -42,7 +42,7 @@ def stop_run(run_id):
     run = AgentRun.query.filter_by(id=run_id).first_or_404()
 
     try:
-        runmgr.stop_run(run)
+        runmgr.user_stop_run(run)
         return {"success": True}
     except Exception as e:
         logger.error(f"Error stopping run {run_id}", exc_info=e)
@@ -73,6 +73,7 @@ def get_logs_stream(run_id):
             while True:
                 # TODO look into better file wathcing (watchdog, inotify) or select(ors)
                 # TODO also stop when run is finished
+                # TODO fix issue with stream being closed, likely caused by sleep statement, introduce keep-alive msgs to fix
                 data = log_file.read(2048)
                 data_encoded = base64.b64encode(data).decode('utf-8')
                 if data:

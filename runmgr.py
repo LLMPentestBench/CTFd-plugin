@@ -21,6 +21,9 @@ TERMINAL_ROWS = 24
 
 logger = logging.getLogger("llmpentestbench.runmgr")
 
+def _get_container_name(agent_run: AgentRun):
+    return "llmptb_" + agent_run.scaffold_id + "_run_" + str(agent_run.id)
+
 def start_run(scaffold: Scaffold, challenge_id):
     agent_run = AgentRun(scaffold_id=scaffold.id, challenge_id=challenge_id, status=AgentRunStatus.INITIATING)
     db.session.add(agent_run)
@@ -38,7 +41,7 @@ def start_run(scaffold: Scaffold, challenge_id):
         os.mkdir(run_work_folder)
         _write_challenge_details(run_work_folder, agent_run.challenge)
 
-        container_name = "llmptb_" + scaffold.id + "_run_" + str(run_id)
+        container_name = _get_container_name(agent_run)
         container = docker_client.containers.run(
             scaffold.get_image_name(),
             detach=True,
@@ -78,8 +81,13 @@ def start_run(scaffold: Scaffold, challenge_id):
         agent_run.mark_errored()
         raise Exception(f"Failed to start run {run_id} for scaffold {scaffold.id} and challenge {challenge_id}") from exc
 
-def stop_run(agent_run: AgentRun):
-    ... # TODO
+def user_stop_run(agent_run: AgentRun):
+    if agent_run.status != AgentRunStatus.RUNNING:
+        raise Exception(f"Can only stop runs that are currently running, run {agent_run.id} is in status {agent_run.status}")
+
+    agent_run.mark_stopped()
+
+    _stop_run(agent_run)
 
 async def _send_heartbeats(agent_run_id, interval=AGENT_RUN_HEARTBEAT_INTERVAL):
     while True:
@@ -95,6 +103,7 @@ async def _send_heartbeats(agent_run_id, interval=AGENT_RUN_HEARTBEAT_INTERVAL):
 @utils.wrap_app_context
 async def _monitor_run_container(container, sock, run_id):
     agent_run = AgentRun.query.get(run_id)
+    db.session.refresh(agent_run)
     agent_run.mark_running()
 
     run_folder = agent_run.get_folder()
@@ -135,12 +144,14 @@ async def _monitor_run_container(container, sock, run_id):
             agent_run.logger.warning("No flag submitted")
 
         sock.close()
-        container.stop(timeout=0) # TODO lighter way of stopping, e.g. sending non-kill signal first and fully timing out later if needed
+        _stop_run(agent_run)
     except Exception as exc:
         agent_run.logger.error(f"Exception while monitoring container", exc_info=exc)
     finally:
-        # container.remove(force=True)
-        agent_run.mark_finished()
+        # Only mark finished when not stopped
+        db.session.refresh(agent_run)
+        if not agent_run.is_finished():
+            agent_run.mark_finished()
 
         time_taken = agent_run.end_time.timestamp() - agent_run.start_time.timestamp()
 
@@ -185,6 +196,9 @@ def _write_challenge_details(folder, challenge) -> str:
         }, f, indent=4)
 
 def _extract_submitted_flag(file_path) -> str | None:
+    """
+    Extract the flag from the given file path (a text file). Returns the flag, or None if the file does not exist.
+    """
     if os.path.exists(file_path):
         with open(file_path, "r") as f:
             submitted_flag = f.read().strip()
@@ -192,6 +206,19 @@ def _extract_submitted_flag(file_path) -> str | None:
         submitted_flag = None
 
     return submitted_flag
+
+def _stop_run(agent_run: AgentRun):
+    try:
+        container_name = _get_container_name(agent_run)
+        container = docker_client.containers.get(container_name)
+
+        # TODO softer stopping for timeout?
+        container.stop(timeout=0)
+        # container.remove(force=True) # TODO add back when remove=True is gone
+        agent_run.logger.info(f"Container stopped")
+    except Exception as exc:
+        agent_run.logger.error(f"Exception while stopping run", exc_info=exc)
+        raise Exception(f"Failed to stop run {agent_run.id}") from exc
 
 def load():
     # TODO cleanup

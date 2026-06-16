@@ -3,7 +3,6 @@ import os
 import datetime
 
 from CTFd.models import Challenges, db
-from sqlalchemy.ext.hybrid import hybrid_property
 
 from .scaffoldmgr import get_scaffold
 
@@ -15,9 +14,9 @@ AGENT_RUN_HEARTBEAT_INTERVAL = 1 # seconds
 AGENT_RUN_HEARTBEAT_TIMEOUT = 5 # seconds
 
 class AgentRunStatus(enum.Enum):
-    # TODO int values for better version control. also adapt config.html cause it displays string values currently
     INITIATING = "initiating"
     RUNNING = "running"
+    STOPPED = "stopped"
     FINISHED = "finished"
     ERRORED = "errored"
     ZOMBIE = "zombie"
@@ -52,9 +51,14 @@ class AgentRun(db.Model):
     
     def is_finished(self):
         return self.status != AgentRunStatus.RUNNING
-    
+
     def mark_running(self):
         self._status = AgentRunStatus.RUNNING
+        db.session.commit()
+
+    def mark_stopped(self):
+        self._status = AgentRunStatus.STOPPED
+        self.end_time = db.func.now()
         db.session.commit()
 
     def mark_finished(self):

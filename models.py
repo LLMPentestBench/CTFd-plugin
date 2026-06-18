@@ -34,6 +34,9 @@ class AgentRun(db.Model):
     start_time = db.Column(db.DateTime, nullable=False, server_default=db.func.now())
     end_time = db.Column(db.DateTime, nullable=True)
 
+    submitted_flag = db.Column(db.Text, nullable=True)
+    flag_correct = db.Column(db.Boolean, nullable=True)
+
     def __init__(self, scaffold_id, challenge_id, status):
         self.scaffold_id = scaffold_id
         self.challenge_id = challenge_id
@@ -69,6 +72,11 @@ class AgentRun(db.Model):
     def mark_errored(self):
         self._status = AgentRunStatus.ERRORED
         self.end_time = db.func.now()
+        db.session.commit()
+    
+    def submit_flag(self, flag, correct):
+        self.submitted_flag = flag
+        self.flag_correct = correct
         db.session.commit()
     
     def get_folder(self):

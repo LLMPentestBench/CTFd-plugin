@@ -140,6 +140,7 @@ async def _monitor_run_container(container, sock, run_id):
         if submitted_flag is not None:
             flag_correct = utils.check_flag(agent_run.challenge, submitted_flag)
             agent_run.logger.info(f"Submitted flag `{submitted_flag}` is {'correct' if flag_correct else 'incorrect'}")
+            agent_run.submit_flag(submitted_flag, flag_correct)
         else:
             agent_run.logger.warning("No flag submitted")
 

@@ -4,8 +4,10 @@ import logging
 from flask import Blueprint, render_template, Response, stream_with_context
 
 from CTFd import CTFdFlask
+from CTFd.plugins.LLMPentestBench import challmgr
 from CTFd.utils.decorators import admins_only, authed_only
 from CTFd.plugins import register_plugin_assets_directory, register_user_page_menu_bar
+from CTFd.models import Challenges
 
 from . import scaffoldmgr, runmgr
 from .models import AgentRun
@@ -54,9 +56,16 @@ def run_challenge(scaffold_id):
     scaffold = scaffoldmgr.get_scaffold(scaffold_id)
     if not scaffold:
         return {"success": False, "error": "Invalid scaffold_id"}, 400
+    
+    challenge_id = "1"  # TODO: Replace with actual challenge selection logic
+    challenge = Challenges.query.filter_by(id=challenge_id).first()
+    if not challenge:
+        return {"success": False, "error": f"Challenge with id {challenge_id} does not exist"}, 400
 
     try:
-        runmgr.start_run(scaffold, challenge_id="1") # TODO challenge_id
+        challmgr.validate_challenge(challenge)
+
+        runmgr.start_run(scaffold, challenge_id=challenge.id)
         return {"success": True}
     except Exception as e:
         logger.error(f"Error starting run for scaffold {scaffold_id}", exc_info=e)

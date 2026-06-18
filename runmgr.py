@@ -4,10 +4,10 @@ import logging
 import threading
 import asyncio
 
-from CTFd.models import db
+from CTFd.models import db, Challenges
 from CTFd.utils.uploads import get_uploader
 
-from . import utils
+from . import utils, challmgr
 from .models import AGENT_RUN_HEARTBEAT_INTERVAL, AgentRun, AgentRunStatus
 from .scaffoldmgr import Scaffold
 from .utils import docker_client
@@ -25,6 +25,11 @@ def _get_container_name(agent_run: AgentRun):
     return "llmptb_" + agent_run.scaffold_id + "_run_" + str(agent_run.id)
 
 def start_run(scaffold: Scaffold, challenge_id):
+    challenge = Challenges.query.filter_by(id=challenge_id).first()
+    if not challenge:
+        raise ValueError(f"Challenge with id {challenge_id} does not exist")
+    challmgr.validate_challenge(challenge) # validate that challenge has flags and the flags are in proper format
+
     agent_run = AgentRun(scaffold_id=scaffold.id, challenge_id=challenge_id, status=AgentRunStatus.INITIATING)
     db.session.add(agent_run)
     db.session.commit()
@@ -141,7 +146,7 @@ async def _monitor_run_container(container, sock, run_id):
 
         submitted_flag = _extract_submitted_flag(agent_run.get_work_folder() + "/flag.txt")
         if submitted_flag is not None:
-            flag_correct = utils.check_flag(agent_run.challenge, submitted_flag)
+            flag_correct = challmgr.check_flag(agent_run.challenge, submitted_flag)
             agent_run.logger.info(f"Submitted flag `{submitted_flag}` is {'correct' if flag_correct else 'incorrect'}")
             agent_run.submit_flag(submitted_flag, flag_correct)
         else:
@@ -171,6 +176,7 @@ def _write_challenge_details(folder, challenge) -> str:
     description = challenge.description
     category = challenge.category
     connection_info = challenge.connection_info
+    flag_format = challmgr.extract_flag_format(challenge)
 
     # Get files from file storage (local / S3), and write to challenge files folder
     files_folder = f"{folder}/files"
@@ -197,6 +203,7 @@ def _write_challenge_details(folder, challenge) -> str:
             "description": description,
             "category": category,
             "connection_info": connection_info,
+            "flag_format": flag_format,
             "files": file_names,
         }, f, indent=4)
 

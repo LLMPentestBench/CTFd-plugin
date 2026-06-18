@@ -41,10 +41,12 @@ def start_run(scaffold: Scaffold, challenge_id):
     try:
         # Populate run folder with challenge details
         run_folder = agent_run.get_folder()
-        run_work_folder = agent_run.get_work_folder()
+        run_input_folder = agent_run.get_input_folder()
+        run_output_folder = agent_run.get_output_folder()
         os.mkdir(run_folder)
-        os.mkdir(run_work_folder)
-        _write_challenge_details(run_work_folder, agent_run.challenge)
+        os.mkdir(run_input_folder)
+        os.mkdir(run_output_folder)
+        _write_challenge_details(run_input_folder, agent_run.challenge)
 
         container_name = _get_container_name(agent_run)
         container = docker_client.containers.run(
@@ -59,8 +61,12 @@ def start_run(scaffold: Scaffold, challenge_id):
                 "llmptb_run": str(run_id),
             },
             volumes={
-                run_work_folder: { # TODO mount subfolder instead
-                    "bind": "/llmptb",
+                run_input_folder: {
+                    "bind": "/llmptb/input",
+                    "mode": "ro",
+                },
+                run_output_folder: {
+                    "bind": "/llmptb/output",
                     "mode": "rw",
                 }
             },
@@ -144,7 +150,7 @@ async def _monitor_run_container(container, sock, run_id):
 
         agent_run.logger.info(f"Finished monitoring container")
 
-        submitted_flag = _extract_submitted_flag(agent_run.get_work_folder() + "/flag.txt")
+        submitted_flag = _extract_submitted_flag(agent_run.get_output_folder() + "/flag.txt")
         if submitted_flag is not None:
             flag_correct = challmgr.check_flag(agent_run.challenge, submitted_flag)
             agent_run.logger.info(f"Submitted flag `{submitted_flag}` is {'correct' if flag_correct else 'incorrect'}")

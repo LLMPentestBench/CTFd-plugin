@@ -82,8 +82,11 @@ class AgentRun(db.Model):
     def get_folder(self):
         return f"{AGENT_RUNS_FOLDER}/{self.id}"
     
-    def get_work_folder(self):
-        return f"{self.get_folder()}/work"
+    def get_input_folder(self):
+        return f"{self.get_folder()}/input"
+
+    def get_output_folder(self):
+        return f"{self.get_folder()}/output"
 
     def heartbeat(self):
         self.last_heartbeat = datetime.datetime.utcnow()

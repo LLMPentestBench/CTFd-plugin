@@ -50,6 +50,9 @@ def start_run(scaffold: Scaffold, challenge_id):
             runtime=DOCKER_RUNTIME,
             network=DOCKER_NETWORK,
             name=container_name,
+            labels={
+                "llmptb_run": str(run_id),
+            },
             volumes={
                 run_work_folder: { # TODO mount subfolder instead
                     "bind": "/llmptb",
@@ -148,6 +151,7 @@ async def _monitor_run_container(container, sock, run_id):
         _stop_run(agent_run)
     except Exception as exc:
         agent_run.logger.error(f"Exception while monitoring container", exc_info=exc)
+        # TODO: in this case, status should not be finished, should be errored probably
     finally:
         # Only mark finished when not stopped
         db.session.refresh(agent_run)
@@ -221,6 +225,25 @@ def _stop_run(agent_run: AgentRun):
         agent_run.logger.error(f"Exception while stopping run", exc_info=exc)
         raise Exception(f"Failed to stop run {agent_run.id}") from exc
 
+def cleanup_containers():
+    """
+    Cleanup any leftover containers from runs that were not properly stopped (e.g. due to CTFd crash). Should be called on plugin load.
+    """
+    for container in docker_client.containers.list(all=True, filters={"label": "llmptb_run"}):
+        try:
+            run_id = int(container.labels.get("llmptb_run"))
+            agent_run = AgentRun.query.get(run_id)
+            if not agent_run:
+                logger.warning(f"Found leftover container named {container.name} with run_id {run_id} but no corresponding database entry, not cleaning up container")
+                continue
+            if agent_run.status != AgentRunStatus.ZOMBIE:
+                logger.warning(f"Found non-zombie leftover container named {container.name} for run {run_id} in status {agent_run.status}, not cleaning up container")
+                continue
+
+            container.remove(force=True)
+            logger.info(f"Cleaned up leftover container named {container.name} for run {run_id} ({container.id[:12]})")
+        except Exception as exc:
+            logger.error(f"Exception while cleaning up leftover container named {container.name} for run {run_id} ({container.id[:12]})", exc_info=exc)
+
 def load():
-    # TODO cleanup
-    pass
+    cleanup_containers()

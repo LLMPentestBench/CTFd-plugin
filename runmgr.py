@@ -236,6 +236,7 @@ def cleanup_containers():
             if not agent_run:
                 logger.warning(f"Found leftover container named {container.name} with run_id {run_id} but no corresponding database entry, not cleaning up container")
                 continue
+            # Only clean up zombie runs, to avoid possible concurrency issues with multiple workers
             if agent_run.status != AgentRunStatus.ZOMBIE:
                 logger.warning(f"Found non-zombie leftover container named {container.name} for run {run_id} in status {agent_run.status}, not cleaning up container")
                 continue

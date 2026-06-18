@@ -5,10 +5,10 @@ import threading
 import asyncio
 
 from CTFd.models import db, Challenges
-from CTFd.utils.uploads import get_uploader
+from CTFd.utils.uploads import get_uploader, hash_file
 
 from . import utils, challmgr
-from .models import AGENT_RUN_HEARTBEAT_INTERVAL, AgentRun, AgentRunStatus
+from .models import AGENT_RUN_HEARTBEAT_INTERVAL, AgentRun, AgentRunStatus, AgentRunFiles
 from .scaffoldmgr import Scaffold
 from .utils import docker_client
 
@@ -158,6 +158,8 @@ async def _monitor_run_container(container, sock, run_id):
         else:
             agent_run.logger.warning("No flag submitted")
 
+        _upload_run_files(agent_run)
+
         sock.close()
         _stop_run(agent_run)
     except Exception as exc:
@@ -213,13 +215,18 @@ def _write_challenge_details(folder, challenge) -> str:
             "files": file_names,
         }, f, indent=4)
 
-def _extract_submitted_flag(file_path) -> str | None:
+def _extract_submitted_flag(file_path, delete: bool = True) -> str | None:
     """
     Extract the flag from the given file path (a text file). Returns the flag, or None if the file does not exist.
+
+    Will delete the file after reading it if `delete` is True.
     """
     if os.path.exists(file_path):
         with open(file_path, "r") as f:
             submitted_flag = f.read().strip()
+        
+        if delete:
+            os.remove(file_path)
     else:
         submitted_flag = None
 
@@ -237,6 +244,33 @@ def _stop_run(agent_run: AgentRun):
     except Exception as exc:
         agent_run.logger.error(f"Exception while stopping run", exc_info=exc)
         raise Exception(f"Failed to stop run {agent_run.id}") from exc
+
+def _upload_run_files(agent_run: AgentRun):
+    folder = agent_run.get_output_folder()
+    uploader = get_uploader()
+
+    for file in os.listdir(folder): # TODO recursive walk
+        try:
+            file_path = f"{folder}/{file}"
+            if not os.path.isfile(file_path):
+                continue
+        
+            with open(file_path, "rb") as f:
+                sha1sum = hash_file(fp=f)
+
+                location = uploader.upload(file_obj=f, filename=file)
+
+            run_file = AgentRunFiles(
+                run_id=agent_run.id,
+                location=location,
+                sha1sum=sha1sum,
+            )
+            db.session.add(run_file)
+
+            agent_run.logger.info(f"Uploaded run file `{file}` with sha1sum {sha1sum}")
+        except Exception as exc:
+            raise Exception(f"Failed to upload run file {file}") from exc
+    db.session.commit()
 
 def cleanup_containers():
     """

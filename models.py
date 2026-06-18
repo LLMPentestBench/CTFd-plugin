@@ -2,7 +2,7 @@ import enum
 import os
 import datetime
 
-from CTFd.models import Challenges, db
+from CTFd.models import Challenges, Files, db
 
 from .scaffoldmgr import get_scaffold
 
@@ -36,6 +36,10 @@ class AgentRun(db.Model):
 
     submitted_flag = db.Column(db.Text, nullable=True)
     flag_correct = db.Column(db.Boolean, nullable=True)
+
+    files = db.relationship(
+        "AgentRunFiles", backref="run", foreign_keys="AgentRunFiles.run_id", lazy="joined"
+    )
 
     def __init__(self, scaffold_id, challenge_id, status):
         self.scaffold_id = scaffold_id
@@ -104,6 +108,19 @@ class AgentRun(db.Model):
     def logger(self):
         from .runmgr import logger
         return logger.getChild(f"run_{self.id:04d}")
+
+class AgentRunFiles(Files):
+    # Give this its own table, to avoid having to edit the CTFd Files table columns
+    __tablename__ = "llmptb_agent_run_files"
+    __mapper_args__ = {"polymorphic_identity": "llmptb_run"}
+
+    id = db.Column(db.Integer, db.ForeignKey("files.id"), primary_key=True)
+    run_id = db.Column(
+        db.Integer, db.ForeignKey("llmptb_agent_runs.id", ondelete="CASCADE")
+    )
+
+    def __init__(self, *args, **kwargs):
+        super(AgentRunFiles, self).__init__(**kwargs)
 
 def create_all():
     db.create_all()

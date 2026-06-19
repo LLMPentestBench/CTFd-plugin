@@ -1,7 +1,7 @@
 import base64
 import logging
 
-from flask import Blueprint, render_template, Response, stream_with_context
+from flask import Blueprint, render_template, Response, stream_with_context, url_for
 
 from CTFd import CTFdFlask
 from CTFd.plugins.LLMPentestBench import challmgr
@@ -35,8 +35,15 @@ def view_config():
 @admins_only
 def view_run(run_id):
     run = AgentRun.query.filter_by(id=run_id).first_or_404()
+    files = [
+        {
+            "filename": f.location.split("/")[-1],
+            "url": url_for("views.files", path=f.location)
+        }
+        for f in run.files
+    ]
 
-    return render_template('llmpentestbench/admin/run.html', run=run)
+    return render_template('llmpentestbench/admin/run.html', run=run, files=files)
 
 @blueprint.route('/api/v1/plugins/llmpentestbench/run/<run_id>/stop', methods=["POST"])
 @admins_only

@@ -155,7 +155,6 @@ async def _monitor_run_container(container, sock, run_id):
         _stop_run(agent_run)
     except Exception as exc:
         agent_run.logger.error(f"Exception while monitoring container", exc_info=exc)
-        # TODO: in this case, status should not be finished, should be errored probably
     finally:
         submitted_flag = _extract_submitted_flag(agent_run.get_output_folder() + "/flag.txt")
         if submitted_flag is not None:
@@ -169,13 +168,12 @@ async def _monitor_run_container(container, sock, run_id):
 
         # Only mark finished when not stopped
         db.session.refresh(agent_run)
-        if not agent_run.is_finished():
+        if agent_run.status == AgentRunStatus.RUNNING:
             agent_run.mark_finished()
 
         time_taken = agent_run.end_time.timestamp() - agent_run.start_time.timestamp()
 
         agent_run.logger.info(f"Container finished in {time_taken:.2f} seconds")
-        # TODO when CTFd crashes, container remains but it shouldnt
 
 def _write_challenge_details(folder, challenge) -> str:
     """
@@ -298,8 +296,8 @@ def cleanup_containers():
                 logger.warning(f"Found leftover container named {container.name} with run_id {run_id} but no corresponding database entry, not cleaning up container")
                 continue
             # Only clean up zombie runs, to avoid possible concurrency issues with multiple workers
-            if agent_run.status != AgentRunStatus.ZOMBIE:
-                logger.warning(f"Found non-zombie leftover container named {container.name} for run {run_id} in status {agent_run.status}, not cleaning up container")
+            if agent_run.status == AgentRunStatus.RUNNING:
+                logger.warning(f"Found running leftover container named {container.name} for run {run_id} in status {agent_run.status}, not cleaning up container")
                 continue
 
             container.remove(force=True)

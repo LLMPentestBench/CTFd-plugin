@@ -118,6 +118,7 @@ class AgentRunFiles(Files):
     run_id = db.Column(
         db.Integer, db.ForeignKey("llmptb_agent_runs.id", ondelete="CASCADE")
     )
+    path = db.Column(db.Text, nullable=False)
 
     def __init__(self, *args, **kwargs):
         super(AgentRunFiles, self).__init__(**kwargs)

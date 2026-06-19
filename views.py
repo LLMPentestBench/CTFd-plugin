@@ -37,7 +37,7 @@ def view_run(run_id):
     run = AgentRun.query.filter_by(id=run_id).first_or_404()
     files = [
         {
-            "filename": f.location.split("/")[-1],
+            "path": f.path,
             "url": url_for("views.files", path=f.location)
         }
         for f in run.files

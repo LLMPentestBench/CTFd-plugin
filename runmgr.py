@@ -3,6 +3,7 @@ import os
 import logging
 import threading
 import asyncio
+from pathlib import Path
 
 from CTFd.models import db, Challenges
 from CTFd.utils.uploads import get_uploader, hash_file
@@ -249,27 +250,30 @@ def _upload_run_files(agent_run: AgentRun):
     folder = agent_run.get_output_folder()
     uploader = get_uploader()
 
-    for file in os.listdir(folder): # TODO recursive walk
+    for path in Path(folder).rglob("*"):
         try:
-            file_path = f"{folder}/{file}"
-            if not os.path.isfile(file_path):
+            if not path.is_file():
                 continue
+
+            filename = path.name
+            relpath = str(path.relative_to(folder))
         
-            with open(file_path, "rb") as f:
+            with open(path, "rb") as f:
                 sha1sum = hash_file(fp=f)
 
-                location = uploader.upload(file_obj=f, filename=file)
+                location = uploader.upload(file_obj=f, filename=filename)
 
             run_file = AgentRunFiles(
                 run_id=agent_run.id,
+                path=relpath,
                 location=location,
                 sha1sum=sha1sum,
             )
             db.session.add(run_file)
 
-            agent_run.logger.info(f"Uploaded run file `{file}` with sha1sum {sha1sum}")
+            agent_run.logger.info(f"Uploaded run file `{relpath}` with sha1sum {sha1sum}")
         except Exception as exc:
-            raise Exception(f"Failed to upload run file {file}") from exc
+            raise Exception(f"Failed to upload run file {path}") from exc
     db.session.commit()
 
 def cleanup_containers():

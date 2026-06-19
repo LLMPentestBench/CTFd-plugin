@@ -151,6 +151,12 @@ async def _monitor_run_container(container, sock, run_id):
 
         agent_run.logger.info(f"Finished monitoring container")
 
+        sock.close()
+        _stop_run(agent_run)
+    except Exception as exc:
+        agent_run.logger.error(f"Exception while monitoring container", exc_info=exc)
+        # TODO: in this case, status should not be finished, should be errored probably
+    finally:
         submitted_flag = _extract_submitted_flag(agent_run.get_output_folder() + "/flag.txt")
         if submitted_flag is not None:
             flag_correct = challmgr.check_flag(agent_run.challenge, submitted_flag)
@@ -161,12 +167,6 @@ async def _monitor_run_container(container, sock, run_id):
 
         _upload_run_files(agent_run)
 
-        sock.close()
-        _stop_run(agent_run)
-    except Exception as exc:
-        agent_run.logger.error(f"Exception while monitoring container", exc_info=exc)
-        # TODO: in this case, status should not be finished, should be errored probably
-    finally:
         # Only mark finished when not stopped
         db.session.refresh(agent_run)
         if not agent_run.is_finished():
@@ -216,18 +216,13 @@ def _write_challenge_details(folder, challenge) -> str:
             "files": file_names,
         }, f, indent=4)
 
-def _extract_submitted_flag(file_path, delete: bool = True) -> str | None:
+def _extract_submitted_flag(file_path) -> str | None:
     """
     Extract the flag from the given file path (a text file). Returns the flag, or None if the file does not exist.
-
-    Will delete the file after reading it if `delete` is True.
     """
     if os.path.exists(file_path):
         with open(file_path, "r") as f:
             submitted_flag = f.read().strip()
-        
-        if delete:
-            os.remove(file_path)
     else:
         submitted_flag = None
 
@@ -274,6 +269,21 @@ def _upload_run_files(agent_run: AgentRun):
             agent_run.logger.info(f"Uploaded run file `{relpath}` with sha1sum {sha1sum}")
         except Exception as exc:
             raise Exception(f"Failed to upload run file {path}") from exc
+
+    # TODO merge this into remainder of the function, possibly split off into _upload_run_file for singular file
+    log_file_path = f"{agent_run.get_folder()}/output.log"
+    with open(log_file_path, "rb") as f:
+        sha1sum = hash_file(fp=f)
+
+        location = uploader.upload(file_obj=f, filename="output.log")
+    run_file = AgentRunFiles(
+        run_id=agent_run.id,
+        path="output.log",
+        location=location,
+        sha1sum=sha1sum,
+    )
+    db.session.add(run_file)
+
     db.session.commit()
 
 def cleanup_containers():

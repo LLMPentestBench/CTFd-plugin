@@ -32,7 +32,8 @@ class AgentRun(db.Model):
     _status = db.Column('status', db.Enum(AgentRunStatus), nullable=False)
     last_heartbeat = db.Column(db.DateTime, nullable=True)
     
-    start_time = db.Column(db.DateTime, nullable=False, server_default=db.func.now())
+    creation_time = db.Column(db.DateTime, nullable=False, default=db.func.now())
+    start_time = db.Column(db.DateTime, nullable=True)
     end_time = db.Column(db.DateTime, nullable=True)
 
     submitted_flag = db.Column(db.Text, nullable=True)
@@ -62,6 +63,7 @@ class AgentRun(db.Model):
 
     def mark_running(self):
         self._status = AgentRunStatus.RUNNING
+        self.start_time = db.func.now()
         db.session.commit()
 
     def mark_stopped(self):

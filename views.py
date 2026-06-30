@@ -27,7 +27,7 @@ blueprint = Blueprint(
 @admins_only
 def view_config():
     scaffolds = scaffoldmgr.get_scaffolds()
-    runs = AgentRun.query.order_by(AgentRun.start_time.desc()).all()
+    runs = AgentRun.query.order_by(AgentRun.creation_time.desc()).all()
 
     return render_template('llmpentestbench/admin/config.html', scaffolds=scaffolds, runs=runs)
 

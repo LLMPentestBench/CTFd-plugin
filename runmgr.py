@@ -1,6 +1,7 @@
 import json
 import os
 import logging
+import time
 from pathlib import Path
 
 import gevent
@@ -17,6 +18,7 @@ DOCKER_RUNTIME = "sysbox-runc"
 DOCKER_NETWORK = "llmptb_proxynet"
 
 CONTAINER_RUN_TIMEOUT = 180 # seconds
+CONTAINER_INITIALIZATION_TIMEOUT = 60 # seconds
 TERMINAL_COLUMNS = 132
 TERMINAL_ROWS = 24
 
@@ -27,9 +29,12 @@ def _get_container_name(agent_run: AgentRun):
 
 def start_run(scaffold: Scaffold, challenge: Challenges):
     challmgr.validate_challenge(challenge) # validate that challenge has flags and the flags are in proper format
+    challenge_id = challenge.id
 
     @utils.wrap_app_context
     def run():
+        challenge = Challenges.query.get(challenge_id) # query challenge again to avoid SQLAlchemy session issues due to greenlet context switching
+
         sock, run_id = _initialize_run_container(scaffold, challenge)
 
         _monitor_run_container(sock, run_id)
@@ -51,7 +56,7 @@ def _initialize_run_container(scaffold: Scaffold, challenge: Challenges):
 
     run_id = agent_run.id
 
-    agent_run.logger.info(f"Starting run with scaffold `{scaffold.id}` for challenge {challenge.id}")
+    agent_run.logger.info(f"Initializing run with scaffold `{scaffold.id}` for challenge {challenge.id}")
     
     try:
         # Populate run folder with challenge details
@@ -61,7 +66,6 @@ def _initialize_run_container(scaffold: Scaffold, challenge: Challenges):
         os.mkdir(run_folder)
         os.mkdir(run_input_folder)
         os.mkdir(run_output_folder)
-        _write_challenge_details(run_input_folder, agent_run.challenge)
 
         container_name = _get_container_name(agent_run)
         container = docker_client.containers.run(
@@ -89,6 +93,13 @@ def _initialize_run_container(scaffold: Scaffold, challenge: Challenges):
         )
         agent_run.logger.info(f"Container ({container.id[:12]}) started")
 
+        _wait_for_container_initialization(container, agent_run)
+
+        agent_run.mark_running()
+        _write_challenge_details(run_input_folder, challenge)
+
+        agent_run.logger.info(f"Executing scaffold command")
+
         command = scaffold.get_command()
         _, sock = container.exec_run(
             f"bash --login -c '{command}'",
@@ -109,9 +120,35 @@ def _initialize_run_container(scaffold: Scaffold, challenge: Challenges):
         agent_run.mark_errored()
         raise Exception(f"Failed to start run {run_id} for scaffold {scaffold.id} and challenge {challenge.id}") from exc
 
+def _wait_for_container_initialization(container, agent_run: AgentRun):
+    deadline = time.monotonic() + CONTAINER_INITIALIZATION_TIMEOUT
+    interval = 1 # seconds
+
+    last_output = None
+    while time.monotonic() < deadline:
+        try:
+            exit_code, output = container.exec_run("systemctl is-system-running --wait")
+        except Exception as exc:
+            agent_run.logger.error("Exception while waiting for container initialization", exc_info=exc)
+            raise Exception(f"Failed to wait for container initialization for run {agent_run.id}") from exc
+
+        last_output = output.decode().strip()
+        if exit_code == 0 and last_output == "running":
+            return exit_code, last_output
+
+        if exit_code != 0 and last_output == "degraded":
+            raise Exception(f"Container systemd is in degraded state for run {agent_run.id}")
+        
+        agent_run.logger.debug(f"Container systemd status: {last_output} (exit code {exit_code})")
+
+        gevent.sleep(interval)
+
+    raise Exception(
+        f"Timed out waiting for systemd in run {agent_run.id}; last status: {last_output}"
+    )
+
 def _monitor_run_container(sock, run_id):
     agent_run = AgentRun.query.get(run_id)
-    agent_run.mark_running()
 
     run_folder = agent_run.get_folder()
     log_file_path = f"{run_folder}/output.log"

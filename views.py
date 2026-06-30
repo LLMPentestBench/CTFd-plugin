@@ -72,7 +72,7 @@ def run_challenge(scaffold_id):
     try:
         challmgr.validate_challenge(challenge)
 
-        runmgr.start_run(scaffold, challenge_id=challenge.id)
+        runmgr.start_run(scaffold, challenge)
         return {"success": True}
     except Exception as e:
         logger.error(f"Error starting run for scaffold {scaffold_id}", exc_info=e)

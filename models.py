@@ -18,6 +18,7 @@ class AgentRunStatus(enum.Enum):
     RUNNING = "running"
     STOPPED = "stopped"
     FINISHED = "finished"
+    TIMED_OUT = "timed_out"
     ERRORED = "errored"
     ZOMBIE = "zombie"
 
@@ -70,6 +71,11 @@ class AgentRun(db.Model):
 
     def mark_finished(self):
         self._status = AgentRunStatus.FINISHED
+        self.end_time = db.func.now()
+        db.session.commit()
+    
+    def mark_timed_out(self):
+        self._status = AgentRunStatus.TIMED_OUT
         self.end_time = db.func.now()
         db.session.commit()
     

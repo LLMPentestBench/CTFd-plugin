@@ -1,10 +1,10 @@
 import json
 import os
 import logging
-import threading
-import asyncio
 from pathlib import Path
 
+import gevent
+import docker
 from CTFd.models import db, Challenges
 from CTFd.utils.uploads import get_uploader, hash_file
 
@@ -25,19 +25,33 @@ logger = logging.getLogger("llmpentestbench.runmgr")
 def _get_container_name(agent_run: AgentRun):
     return "llmptb_" + agent_run.scaffold_id + "_run_" + str(agent_run.id)
 
-def start_run(scaffold: Scaffold, challenge_id):
-    challenge = Challenges.query.filter_by(id=challenge_id).first()
-    if not challenge:
-        raise ValueError(f"Challenge with id {challenge_id} does not exist")
+def start_run(scaffold: Scaffold, challenge: Challenges):
     challmgr.validate_challenge(challenge) # validate that challenge has flags and the flags are in proper format
 
-    agent_run = AgentRun(scaffold_id=scaffold.id, challenge_id=challenge_id, status=AgentRunStatus.INITIATING)
+    @utils.wrap_app_context
+    def run():
+        sock, run_id = _initialize_run_container(scaffold, challenge)
+
+        _monitor_run_container(sock, run_id)
+
+    gevent.spawn(run)
+
+def user_stop_run(agent_run: AgentRun):
+    if agent_run.status != AgentRunStatus.RUNNING:
+        raise Exception(f"Can only stop runs that are currently running, run {agent_run.id} is in status {agent_run.status}")
+
+    agent_run.mark_stopped()
+
+    _stop_run(agent_run)
+
+def _initialize_run_container(scaffold: Scaffold, challenge: Challenges):
+    agent_run = AgentRun(scaffold_id=scaffold.id, challenge_id=challenge.id, status=AgentRunStatus.INITIATING)
     db.session.add(agent_run)
     db.session.commit()
 
     run_id = agent_run.id
 
-    agent_run.logger.info(f"Starting run with scaffold `{scaffold.id}` for challenge {challenge_id}")
+    agent_run.logger.info(f"Starting run with scaffold `{scaffold.id}` for challenge {challenge.id}")
     
     try:
         # Populate run folder with challenge details
@@ -88,92 +102,76 @@ def start_run(scaffold: Scaffold, challenge_id):
                 "LINES": str(TERMINAL_ROWS),
             }
         )
-        
-        thread = threading.Thread(target=asyncio.run, args=(_monitor_run_container(container, sock, run_id),), daemon=True)
-        thread.start()
+
+        return sock, run_id
     except Exception as exc:
         agent_run.logger.error(f"Exception while starting run", exc_info=exc)
         agent_run.mark_errored()
-        raise Exception(f"Failed to start run {run_id} for scaffold {scaffold.id} and challenge {challenge_id}") from exc
+        raise Exception(f"Failed to start run {run_id} for scaffold {scaffold.id} and challenge {challenge.id}") from exc
 
-def user_stop_run(agent_run: AgentRun):
-    if agent_run.status != AgentRunStatus.RUNNING:
-        raise Exception(f"Can only stop runs that are currently running, run {agent_run.id} is in status {agent_run.status}")
-
-    agent_run.mark_stopped()
-
-    _stop_run(agent_run)
-
-async def _send_heartbeats(agent_run_id, interval=AGENT_RUN_HEARTBEAT_INTERVAL):
-    while True:
-        agent_run = AgentRun.query.get(agent_run_id)
-        if agent_run is None or agent_run.is_finished():
-            break
-
-        agent_run.heartbeat()
-        agent_run.logger.debug(f"Sent heartbeat")
-
-        await asyncio.sleep(interval)
-
-@utils.wrap_app_context
-async def _monitor_run_container(container, sock, run_id):
+def _monitor_run_container(sock, run_id):
     agent_run = AgentRun.query.get(run_id)
-    db.session.refresh(agent_run)
     agent_run.mark_running()
 
     run_folder = agent_run.get_folder()
     log_file_path = f"{run_folder}/output.log"
 
     try:
-        timeout_task = asyncio.create_task(asyncio.sleep(CONTAINER_RUN_TIMEOUT))
-        stream_task = asyncio.create_task(
-            asyncio.to_thread(utils.stream_socket_to_file, sock, log_file_path)
-        )
-        # Send heartbeats for zombie run detection
-        heartbeat_task = asyncio.create_task(_send_heartbeats(run_id))
+        @utils.wrap_app_context
+        def heartbeat_loop():
+            agent_run = AgentRun.query.get(run_id)
+            
+            while True:
+                agent_run.heartbeat()
+                agent_run.logger.info(f"Sent heartbeat")
+                
+                gevent.sleep(AGENT_RUN_HEARTBEAT_INTERVAL)
+
+        @utils.wrap_app_context
+        def timeout_killer():
+            agent_run = AgentRun.query.get(run_id)
+            
+            gevent.sleep(CONTAINER_RUN_TIMEOUT)
+            
+            agent_run.logger.warning("Run timed out, stopping container")
+            agent_run.mark_timed_out()
+            try:
+                _stop_run(agent_run)
+            except Exception:
+                pass
+
+        heartbeat_greenlet = gevent.spawn(heartbeat_loop)
+        timeout_greenlet = gevent.spawn(timeout_killer)
 
         try:
-            # Wait for container to finish or timeout to expire
-            await asyncio.wait(
-                [timeout_task, stream_task],
-                return_when=asyncio.FIRST_COMPLETED,
-            )
+            utils.stream_socket_to_file(sock, log_file_path)
         finally:
-            # Cancel all tasks and wait for them to finish
-            timeout_task.cancel()
-            stream_task.cancel()
-            heartbeat_task.cancel()
-
-            await asyncio.gather(
-                heartbeat_task, timeout_task, stream_task,
-                return_exceptions=True,
-            )
-
-        agent_run.logger.info(f"Finished monitoring container")
-
-        sock.close()
-        _stop_run(agent_run)
+            heartbeat_greenlet.kill()
+            timeout_greenlet.kill()
+            sock.close()
     except Exception as exc:
         agent_run.logger.error(f"Exception while monitoring container", exc_info=exc)
+        return
     finally:
-        submitted_flag = _extract_submitted_flag(agent_run.get_output_folder() + "/flag.txt")
-        if submitted_flag is not None:
-            flag_correct = challmgr.check_flag(agent_run.challenge, submitted_flag)
-            agent_run.logger.info(f"Submitted flag `{submitted_flag}` is {'correct' if flag_correct else 'incorrect'}")
-            agent_run.submit_flag(submitted_flag, flag_correct)
-        else:
-            agent_run.logger.warning("No flag submitted")
+        _stop_run(agent_run)
 
-        _upload_run_files(agent_run)
+    db.session.refresh(agent_run)
 
-        # Only mark finished when not stopped
-        db.session.refresh(agent_run)
-        if agent_run.status == AgentRunStatus.RUNNING:
-            agent_run.mark_finished()
+    if agent_run.status in [AgentRunStatus.STOPPED, AgentRunStatus.TIMED_OUT]:
+        # If stopped or timeout, simply exit
+        return
+    elif agent_run.status != AgentRunStatus.RUNNING:
+        agent_run.logger.error(f"Run finished with unexpected status {agent_run.status}")
+        return
 
-        time_taken = agent_run.end_time.timestamp() - agent_run.start_time.timestamp()
+    agent_run.logger.info(f"Finished monitoring container")
+    agent_run.mark_finished()
 
-        agent_run.logger.info(f"Container finished in {time_taken:.2f} seconds")
+    _extract_submitted_flag(agent_run)
+    _upload_run_files(agent_run)
+
+    time_taken = agent_run.end_time.timestamp() - agent_run.start_time.timestamp()
+    agent_run.logger.info(f"Container finished in {time_taken:.2f} seconds")
 
 def _write_challenge_details(folder, challenge) -> str:
     """
@@ -214,22 +212,27 @@ def _write_challenge_details(folder, challenge) -> str:
             "files": file_names,
         }, f, indent=4)
 
-def _extract_submitted_flag(file_path) -> str | None:
-    """
-    Extract the flag from the given file path (a text file). Returns the flag, or None if the file does not exist.
-    """
-    if os.path.exists(file_path):
-        with open(file_path, "r") as f:
-            submitted_flag = f.read().strip()
-    else:
-        submitted_flag = None
+def _extract_submitted_flag(agent_run: AgentRun):
+    file_path = agent_run.get_output_folder() + "/flag.txt"
 
-    return submitted_flag
+    if not os.path.exists(file_path):
+        agent_run.logger.warning("No flag submitted")
+        return
+
+    with open(file_path, "r") as f:
+        submitted_flag = f.read().strip()
+
+    flag_correct = challmgr.check_flag(agent_run.challenge, submitted_flag)
+    agent_run.logger.info(f"Submitted flag `{submitted_flag}` is {'correct' if flag_correct else 'incorrect'}")
+    agent_run.submit_flag(submitted_flag, flag_correct)
 
 def _stop_run(agent_run: AgentRun):
     try:
         container_name = _get_container_name(agent_run)
-        container = docker_client.containers.get(container_name)
+        try:
+            container = docker_client.containers.get(container_name)
+        except docker.errors.NotFound:
+            return
 
         # TODO softer stopping for timeout?
         container.stop(timeout=0)

@@ -1,3 +1,4 @@
+import re
 import json
 import os
 import logging
@@ -17,7 +18,7 @@ from .utils import docker_client
 DOCKER_RUNTIME = "sysbox-runc"
 DOCKER_NETWORK = "llmptb_proxynet"
 
-CONTAINER_RUN_TIMEOUT = 180 # seconds
+CONTAINER_RUN_TIMEOUT = 300 # seconds
 CONTAINER_INITIALIZATION_TIMEOUT = 60 # seconds
 TERMINAL_COLUMNS = 132
 TERMINAL_ROWS = 24
@@ -91,16 +92,16 @@ def _initialize_run_container(scaffold: Scaffold, challenge: Challenges):
             },
             remove=True, # TODO remove and do manual cleanup, see also _monitor_run_container finally block
         )
-        agent_run.logger.info(f"Container ({container.id[:12]}) started")
+        agent_run.logger.info(f"Container ({container.id[:12]}) started, waiting for initialization")
 
         _wait_for_container_initialization(container, agent_run)
 
         agent_run.mark_running()
         _write_challenge_details(run_input_folder, challenge)
 
-        agent_run.logger.info(f"Executing scaffold command")
+        agent_run.logger.info(f"Initialization complete, executing scaffold command")
 
-        command = scaffold.get_command()
+        command = scaffold.get_command(challenge)
         _, sock = container.exec_run(
             f"bash --login -c '{command}'",
             stdin=True,
@@ -204,7 +205,11 @@ def _monitor_run_container(sock, run_id):
     agent_run.logger.info(f"Finished monitoring container")
     agent_run.mark_finished()
 
-    _extract_submitted_flag(agent_run)
+    if agent_run.scaffold.use_output_flag_scanning():
+        _scan_output_for_flag(agent_run)
+    else:
+        _extract_submitted_flag(agent_run)
+    
     _upload_run_files(agent_run)
 
     time_taken = agent_run.end_time.timestamp() - agent_run.start_time.timestamp()
@@ -262,6 +267,29 @@ def _extract_submitted_flag(agent_run: AgentRun):
     flag_correct = challmgr.check_flag(agent_run.challenge, submitted_flag)
     agent_run.logger.info(f"Submitted flag `{submitted_flag}` is {'correct' if flag_correct else 'incorrect'}")
     agent_run.submit_flag(submitted_flag, flag_correct)
+
+def _scan_output_for_flag(agent_run: AgentRun):
+    """
+    Scan the output folder for any files that contain a flag in the expected format.
+    If a flag is found, submit it to CTFd.
+    """
+    flag_format = challmgr.extract_flag_format(agent_run.challenge)
+
+    run_folder = agent_run.get_folder()
+    log_file = f"{run_folder}/output.log"
+
+    with open(log_file, "r", errors="ignore") as f:
+        content = f.read()
+
+    matches = re.findall(flag_format, content)
+    if not matches:
+        agent_run.logger.warning("No flags found in output")
+        return
+    
+    chosen_match = matches[-1] # last mentioned match
+    flag_correct = challmgr.check_flag(agent_run.challenge, chosen_match)
+    agent_run.logger.info(f"Found flag `{chosen_match}` in output, which is {'correct' if flag_correct else 'incorrect'}")
+    agent_run.submit_flag(chosen_match, flag_correct)
 
 def _stop_run(agent_run: AgentRun):
     try:

@@ -2,6 +2,8 @@ import os
 import abc
 import logging
 
+from CTFd.models import Challenges
+
 from . import utils
 from .utils import docker_client
 
@@ -19,11 +21,18 @@ class Scaffold(abc.ABC):
     def get_image_name(self):
         ...
 
-    def get_command(self) -> str:
+    def get_command(self, challenge: Challenges) -> str:
         ...
 
     def is_available(self) -> bool:
         return docker_client.images.list(name=self.get_image_name()) != []
+    
+    def use_output_flag_scanning(self) -> bool:
+        """
+        Override this method to return False if the scaffold image does it's own flag submission 
+        by writing the flag to `/llmptb/output/flag.txt`.
+        """
+        return True
 
 def get_scaffolds() -> list['Scaffold']:
     return list(_scaffolds.values())

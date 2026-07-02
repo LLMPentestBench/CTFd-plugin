@@ -11,7 +11,7 @@ class ExampleScaffold(Scaffold):
     def get_image_name(self):
         return f"ghcr.io/llmpentestbench/agent-example:latest"
 
-    def get_command(self) -> str:
+    def get_command(self, challenge) -> str:
         return "/entrypoint"
 
 def load():

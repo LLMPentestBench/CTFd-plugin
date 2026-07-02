@@ -11,7 +11,7 @@ class CybersecurityAi(Scaffold):
     def get_image_name(self):
         return f"ghcr.io/llmpentestbench/agent-cybersecurity-ai:latest"
 
-    def get_command(self) -> str:
+    def get_command(self, challenge) -> str:
         return "cai \"Test https://beginner-chall.tptech.nl/\""
         # TODO look into src/cai/sdk/agents/run.py L407 run_streamed
 

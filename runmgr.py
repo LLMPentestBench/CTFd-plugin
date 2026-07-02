@@ -194,10 +194,10 @@ def _monitor_run_container(sock, run_id):
 
     db.session.refresh(agent_run)
 
-    if agent_run.status in [AgentRunStatus.STOPPED, AgentRunStatus.TIMED_OUT]:
-        # If stopped or timeout, simply exit
+    if agent_run.status == AgentRunStatus.STOPPED:
+        # If stopped, simply exit
         return
-    elif agent_run.status != AgentRunStatus.RUNNING:
+    elif agent_run.status not in [AgentRunStatus.RUNNING, AgentRunStatus.TIMED_OUT]:
         agent_run.logger.error(f"Run finished with unexpected status {agent_run.status}")
         return
 

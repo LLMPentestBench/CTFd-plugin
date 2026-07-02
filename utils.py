@@ -2,6 +2,7 @@ import functools
 import os
 import importlib
 import inspect
+import re
 
 import docker
 import flask
@@ -59,3 +60,12 @@ def wrap_app_context(func):
             with current_app.app_context():
                 return func(*args, **kwargs)
         return wrapper
+
+# From https://stackoverflow.com/a/14693789
+ANSI_STRIP_REGEX = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+
+def strip_ansi_escape_sequences(text: str) -> str:
+    """
+    Strips ANSI escape sequences from the given text.
+    """
+    return ANSI_STRIP_REGEX.sub('', text)

@@ -1,7 +1,7 @@
-import re
 import json
 import os
 import logging
+import re
 import time
 from pathlib import Path
 
@@ -279,7 +279,8 @@ def _scan_output_for_flag(agent_run: AgentRun):
     log_file = f"{run_folder}/output.log"
 
     with open(log_file, "r", errors="ignore") as f:
-        content = f.read()
+        # Strip ANSI escape sequences, in case there are color codes halfway through the flag
+        content = utils.strip_ansi_escape_sequences(f.read())
 
     matches = re.findall(flag_format, content)
     if not matches:

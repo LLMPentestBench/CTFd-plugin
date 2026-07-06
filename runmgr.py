@@ -10,7 +10,7 @@ import docker
 from CTFd.models import db, Challenges
 from CTFd.utils.uploads import get_uploader, hash_file
 
-from . import utils, challmgr
+from . import utils, challmgr, scoremgr
 from .models import AGENT_RUN_HEARTBEAT_INTERVAL, AgentRun, AgentRunStatus, AgentRunFiles
 from .scaffoldmgr import Scaffold
 from .utils import docker_client
@@ -34,6 +34,7 @@ def start_run(scaffold: Scaffold, challenge: Challenges):
 
     @utils.wrap_app_context
     def run():
+        # TODO add some try except around these with more details
         challenge = Challenges.query.get(challenge_id) # query challenge again to avoid SQLAlchemy session issues due to greenlet context switching
 
         sock, run_id = _initialize_run_container(scaffold, challenge)
@@ -90,7 +91,7 @@ def _initialize_run_container(scaffold: Scaffold, challenge: Challenges):
                     "mode": "rw",
                 }
             },
-            remove=True, # TODO remove and do manual cleanup, see also _monitor_run_container finally block
+            remove=True, # TODO remove and do manual cleanup, see also _stop_run
         )
         agent_run.logger.info(f"Container ({container.id[:12]}) started, waiting for initialization")
 
@@ -151,6 +152,12 @@ def _wait_for_container_initialization(container, agent_run: AgentRun):
 def _monitor_run_container(sock, run_id):
     agent_run = AgentRun.query.get(run_id)
 
+    try:
+        container = docker_client.containers.get(_get_container_name(agent_run))
+        container_ip_address = container.attrs['NetworkSettings']['Networks'][DOCKER_NETWORK]['IPAddress']
+    except Exception as exc:
+        raise Exception(f"Failed to get container IP address for run {run_id}") from exc
+
     run_folder = agent_run.get_folder()
     log_file_path = f"{run_folder}/output.log"
 
@@ -161,7 +168,7 @@ def _monitor_run_container(sock, run_id):
             
             while True:
                 agent_run.heartbeat()
-                agent_run.logger.info(f"Sent heartbeat")
+                agent_run.logger.debug(f"Sent heartbeat")
                 
                 gevent.sleep(AGENT_RUN_HEARTBEAT_INTERVAL)
 
@@ -176,7 +183,7 @@ def _monitor_run_container(sock, run_id):
             try:
                 _stop_run(agent_run)
             except Exception:
-                pass
+                agent_run.logger.error(f"Exception while stopping run after timeout", exc_info=True)
 
         heartbeat_greenlet = gevent.spawn(heartbeat_loop)
         timeout_greenlet = gevent.spawn(timeout_killer)
@@ -203,12 +210,16 @@ def _monitor_run_container(sock, run_id):
         return
 
     agent_run.logger.info(f"Finished monitoring container")
-    agent_run.mark_finished()
+    if agent_run.status == AgentRunStatus.RUNNING:
+        agent_run.mark_finished()
 
     if agent_run.scaffold.use_output_flag_scanning():
         _scan_output_for_flag(agent_run)
     else:
         _extract_submitted_flag(agent_run)
+    
+    llm_stats = scoremgr.get_run_llm_statistics(agent_run, container_ip_address, current_time_instead_of_end_time=True)
+    agent_run.set_llm_statistics(llm_stats)
     
     _upload_run_files(agent_run)
 

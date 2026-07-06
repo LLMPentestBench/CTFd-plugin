@@ -20,6 +20,9 @@ class Scaffold(abc.ABC):
 
     def get_image_name(self):
         ...
+    
+    def get_litellm_key_alias(self) -> str:
+        ...
 
     def get_command(self, challenge: Challenges) -> str:
         ...

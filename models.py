@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import enum
 import os
 import datetime
@@ -22,6 +23,19 @@ class AgentRunStatus(enum.Enum):
     ERRORED = "errored"
     ZOMBIE = "zombie"
 
+@dataclass
+class AgentRunLLMStatistics:
+    calls_total: int
+    calls_failed: int
+    total_spend: float
+    total_prompt_tokens: int
+    total_completion_tokens: int
+    total_time: float
+
+    @property
+    def average_tps(self):
+        return self.total_completion_tokens / self.total_time if self.total_time > 0 else 0
+
 class AgentRun(db.Model):
     __tablename__ = "llmptb_agent_runs"
 
@@ -38,6 +52,14 @@ class AgentRun(db.Model):
 
     submitted_flag = db.Column(db.Text, nullable=True)
     flag_correct = db.Column(db.Boolean, nullable=True)
+
+    # LLM statistics
+    llm_calls_total = db.Column(db.Integer, nullable=True)
+    llm_calls_failed = db.Column(db.Integer, nullable=True)
+    llm_total_spend = db.Column(db.Float, nullable=True)
+    llm_total_prompt_tokens = db.Column(db.Integer, nullable=True)
+    llm_total_completion_tokens = db.Column(db.Integer, nullable=True)
+    llm_total_time = db.Column(db.Float, nullable=True)
 
     files = db.relationship(
         "AgentRunFiles", backref="run", foreign_keys="AgentRunFiles.run_id", lazy="joined"
@@ -57,6 +79,20 @@ class AgentRun(db.Model):
                 db.session.commit()
 
         return self._status
+    
+    @property
+    def llm_statistics(self):
+        if self.llm_calls_total is None:
+            return None
+
+        return AgentRunLLMStatistics(
+            calls_total=self.llm_calls_total,
+            calls_failed=self.llm_calls_failed,
+            total_spend=self.llm_total_spend,
+            total_prompt_tokens=self.llm_total_prompt_tokens,
+            total_completion_tokens=self.llm_total_completion_tokens,
+            total_time=self.llm_total_time
+        )
     
     def is_finished(self):
         return self.status != AgentRunStatus.RUNNING
@@ -89,6 +125,15 @@ class AgentRun(db.Model):
     def submit_flag(self, flag, correct):
         self.submitted_flag = flag
         self.flag_correct = correct
+        db.session.commit()
+
+    def set_llm_statistics(self, stats: AgentRunLLMStatistics):
+        self.llm_calls_total = stats.calls_total
+        self.llm_calls_failed = stats.calls_failed
+        self.llm_total_spend = stats.total_spend
+        self.llm_total_prompt_tokens = stats.total_prompt_tokens
+        self.llm_total_completion_tokens = stats.total_completion_tokens
+        self.llm_total_time = stats.total_time
         db.session.commit()
     
     def get_folder(self):

@@ -115,6 +115,8 @@ def _initialize_run_container(scaffold: Scaffold, challenge: Challenges):
                 "LINES": str(TERMINAL_ROWS),
             }
         )
+        # Rather than make default socket blocking, do it only on our own sockets. Fixes https://github.com/LLMPentestBench/CTFd-plugin/issues/48
+        sock._sock.setblocking(True)
 
         return sock, run_id
     except Exception as exc:
@@ -194,6 +196,7 @@ def _monitor_run_container(sock, run_id):
             heartbeat_greenlet.kill()
             timeout_greenlet.kill()
             sock.close()
+        # TODO: this above call will exit during the _stop_run execution, causing race condition
     except Exception as exc:
         agent_run.logger.error(f"Exception while monitoring container", exc_info=exc)
         return

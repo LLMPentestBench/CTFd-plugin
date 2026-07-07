@@ -34,12 +34,26 @@ def start_run(scaffold: Scaffold, challenge: Challenges):
 
     @utils.wrap_app_context
     def run():
-        # TODO add some try except around these with more details
         challenge = Challenges.query.get(challenge_id) # query challenge again to avoid SQLAlchemy session issues due to greenlet context switching
+        agent_run = AgentRun(scaffold_id=scaffold.id, challenge_id=challenge.id, status=AgentRunStatus.INITIATING)
+        db.session.add(agent_run)
+        db.session.commit()
 
-        sock, run_id = _initialize_run_container(scaffold, challenge)
+        agent_run.logger.info(f"Initializing run with scaffold `{scaffold.id}` for challenge {challenge.id}")
 
-        _monitor_run_container(sock, run_id)
+        try:
+            sock, run_id = _initialize_run_container(agent_run)
+        except Exception as exc:
+            agent_run.logger.error(f"Exception while initializing run", exc_info=exc)
+            agent_run.mark_errored()
+            return
+
+        try:
+            _monitor_run_container(sock, run_id)
+        except Exception as exc:
+            agent_run.logger.error(f"Exception while monitoring run", exc_info=exc)
+            agent_run.mark_errored()
+            return
 
     gevent.spawn(run)
 
@@ -51,78 +65,71 @@ def user_stop_run(agent_run: AgentRun):
 
     _stop_run(agent_run)
 
-def _initialize_run_container(scaffold: Scaffold, challenge: Challenges):
-    agent_run = AgentRun(scaffold_id=scaffold.id, challenge_id=challenge.id, status=AgentRunStatus.INITIATING)
-    db.session.add(agent_run)
-    db.session.commit()
-
+def _initialize_run_container(agent_run: AgentRun):
     run_id = agent_run.id
-
-    agent_run.logger.info(f"Initializing run with scaffold `{scaffold.id}` for challenge {challenge.id}")
+    scaffold = agent_run.scaffold
+    challenge = agent_run.challenge
     
-    try:
-        # Populate run folder with challenge details
-        run_folder = agent_run.get_folder()
-        run_input_folder = agent_run.get_input_folder()
-        run_output_folder = agent_run.get_output_folder()
-        os.mkdir(run_folder)
-        os.mkdir(run_input_folder)
-        os.mkdir(run_output_folder)
+    # Populate run folder with challenge details
+    run_folder = agent_run.get_folder()
+    run_input_folder = agent_run.get_input_folder()
+    run_output_folder = agent_run.get_output_folder()
+    os.mkdir(run_folder)
+    os.mkdir(run_input_folder)
+    os.mkdir(run_output_folder)
 
-        container_name = _get_container_name(agent_run)
-        container = docker_client.containers.run(
-            scaffold.get_image_name(),
-            detach=True,
-            tty=True,
-            stdin_open=True,
-            runtime=DOCKER_RUNTIME,
-            network=DOCKER_NETWORK,
-            name=container_name,
-            labels={
-                "llmptb_run": str(run_id),
+    container_name = _get_container_name(agent_run)
+    container = docker_client.containers.run(
+        scaffold.get_image_name(),
+        detach=True,
+        tty=True,
+        stdin_open=True,
+        runtime=DOCKER_RUNTIME,
+        network=DOCKER_NETWORK,
+        name=container_name,
+        labels={
+            "llmptb_run": str(run_id),
+        },
+        volumes={
+            run_input_folder: {
+                "bind": "/llmptb/input",
+                "mode": "ro",
             },
-            volumes={
-                run_input_folder: {
-                    "bind": "/llmptb/input",
-                    "mode": "ro",
-                },
-                run_output_folder: {
-                    "bind": "/llmptb/output",
-                    "mode": "rw",
-                }
-            },
-            remove=True, # TODO remove and do manual cleanup, see also _stop_run
-        )
-        agent_run.logger.info(f"Container ({container.id[:12]}) started, waiting for initialization")
-
-        _wait_for_container_initialization(container, agent_run)
-
-        agent_run.mark_running()
-        _write_challenge_details(run_input_folder, challenge)
-
-        agent_run.logger.info(f"Initialization complete, executing scaffold command")
-
-        command = scaffold.get_command(challenge)
-        _, sock = container.exec_run(
-            f"bash --login -c '{command}'",
-            stdin=True,
-            tty=True,
-            socket=True,
-            workdir="/root",
-            environment={ # Run in color with the terminal dimensions used by the frontend
-                "TERM": "xterm-256color",
-                "COLUMNS": str(TERMINAL_COLUMNS),
-                "LINES": str(TERMINAL_ROWS),
+            run_output_folder: {
+                "bind": "/llmptb/output",
+                "mode": "rw",
             }
-        )
-        # Rather than make default socket blocking, do it only on our own sockets. Fixes https://github.com/LLMPentestBench/CTFd-plugin/issues/48
-        sock._sock.setblocking(True)
+        },
+        remove=True, # TODO remove and do manual cleanup, see also _stop_run
+    )
+    agent_run.logger.info(f"Container ({container.id[:12]}) started, waiting for initialization")
 
-        return sock, run_id
-    except Exception as exc:
-        agent_run.logger.error(f"Exception while starting run", exc_info=exc)
-        agent_run.mark_errored()
-        raise Exception(f"Failed to start run {run_id} for scaffold {scaffold.id} and challenge {challenge.id}") from exc
+    # Wait for container to be ready, e.g. Docker images loaded
+    _wait_for_container_initialization(container, agent_run)
+
+    # Start timer and mark as running, then feed challenge details to prevent cheating
+    agent_run.mark_running()
+    _write_challenge_details(run_input_folder, challenge)
+
+    agent_run.logger.info(f"Initialization complete, executing scaffold command")
+
+    command = scaffold.get_command(challenge)
+    _, sock = container.exec_run(
+        f"bash --login -c '{command}'",
+        stdin=True,
+        tty=True,
+        socket=True,
+        workdir="/root",
+        environment={ # Run in color with the terminal dimensions used by the frontend
+            "TERM": "xterm-256color",
+            "COLUMNS": str(TERMINAL_COLUMNS),
+            "LINES": str(TERMINAL_ROWS),
+        }
+    )
+    # Fixes https://github.com/LLMPentestBench/CTFd-plugin/issues/48
+    sock._sock.setblocking(True)
+
+    return sock, run_id
 
 def _wait_for_container_initialization(container, agent_run: AgentRun):
     deadline = time.monotonic() + CONTAINER_INITIALIZATION_TIMEOUT
@@ -133,7 +140,6 @@ def _wait_for_container_initialization(container, agent_run: AgentRun):
         try:
             exit_code, output = container.exec_run("systemctl is-system-running --wait")
         except Exception as exc:
-            agent_run.logger.error("Exception while waiting for container initialization", exc_info=exc)
             raise Exception(f"Failed to wait for container initialization for run {agent_run.id}") from exc
 
         last_output = output.decode().strip()
@@ -141,7 +147,7 @@ def _wait_for_container_initialization(container, agent_run: AgentRun):
             return exit_code, last_output
 
         if exit_code != 0 and last_output == "degraded":
-            raise Exception(f"Container systemd is in degraded state for run {agent_run.id}")
+            raise Exception(f"Container systemd is in degraded state for run {agent_run.id} (a service failed to start)")
         
         agent_run.logger.debug(f"Container systemd status: {last_output} (exit code {exit_code})")
 
@@ -192,14 +198,11 @@ def _monitor_run_container(sock, run_id):
 
         try:
             utils.stream_socket_to_file(sock, log_file_path)
+            # TODO: this above call will exit during the _stop_run execution, causing race condition
         finally:
             heartbeat_greenlet.kill()
             timeout_greenlet.kill()
             sock.close()
-        # TODO: this above call will exit during the _stop_run execution, causing race condition
-    except Exception as exc:
-        agent_run.logger.error(f"Exception while monitoring container", exc_info=exc)
-        return
     finally:
         _stop_run(agent_run)
 
@@ -209,8 +212,7 @@ def _monitor_run_container(sock, run_id):
         # If stopped, simply exit
         return
     elif agent_run.status not in [AgentRunStatus.RUNNING, AgentRunStatus.TIMED_OUT]:
-        agent_run.logger.error(f"Run finished with unexpected status {agent_run.status}")
-        return
+        raise Exception(f"Run finished with unexpected status {agent_run.status}")
 
     agent_run.logger.info(f"Finished monitoring container")
     if agent_run.status == AgentRunStatus.RUNNING:

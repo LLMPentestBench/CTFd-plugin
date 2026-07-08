@@ -1,7 +1,7 @@
 import base64
 import logging
 
-from flask import Blueprint, render_template, Response, stream_with_context, url_for
+from flask import Blueprint, render_template, Response, request, stream_with_context, url_for
 
 from CTFd import CTFdFlask
 from CTFd.plugins.LLMPentestBench import challmgr
@@ -30,6 +30,44 @@ def view_config():
     runs = AgentRun.query.order_by(AgentRun.creation_time.desc()).all()
 
     return render_template('llmpentestbench/admin/config.html', scaffolds=scaffolds, runs=runs)
+
+@blueprint.route('/admin/llmpentestbench/create_benchmark', methods=["GET", "POST"])
+@admins_only
+def view_create_benchmark():
+    if request.method == "GET":
+        scaffolds = scaffoldmgr.get_scaffolds()
+        challenges = Challenges.query.all()
+
+        return render_template('llmpentestbench/admin/create_benchmark.html', scaffolds=scaffolds, challenges=challenges)
+    elif request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        scaffold_ids = data.get("scaffolds") or []
+        challenge_ids = data.get("challenges") or []
+        runs_per_pair = data.get("runs_per_pair")
+        stop_condition = data.get("stop_condition")
+        time_limit = data.get("time_limit")
+
+        if not scaffold_ids:
+            return {"success": False, "error": "Select at least one scaffold"}, 400
+
+        if not challenge_ids:
+            return {"success": False, "error": "Select at least one challenge"}, 400
+
+        if not isinstance(runs_per_pair, int) or runs_per_pair < 1:
+            return {"success": False, "error": "Invalid amount of runs"}, 400
+
+        if stop_condition not in {"first_success", "finish_all"}:
+            return {"success": False, "error": "Invalid stop condition"}, 400
+
+        if not isinstance(time_limit, int) or time_limit < 1:
+            return {"success": False, "error": "Invalid time limit"}, 400
+        
+        scaffolds = [scaffoldmgr.get_scaffold(sid) for sid in scaffold_ids]
+        challenges = [Challenges.query.filter_by(id=cid).first() for cid in challenge_ids]
+
+        logger.info(f"Received benchmark creation request (scaffolds={scaffold_ids}, challenges={challenge_ids}, runs_per_pair={runs_per_pair}, stop_condition={stop_condition}, time_limit={time_limit})")
+
+        return {"success": True}
 
 @blueprint.route('/admin/llmpentestbench/run/<run_id>')
 @admins_only

@@ -271,6 +271,9 @@ def _write_challenge_details(folder, challenge) -> str:
         }, f, indent=4)
 
 def _extract_submitted_flag(agent_run: AgentRun):
+    """
+    Extract the container-submitted flag (not from output scanning) and submit it for the run.
+    """
     file_path = agent_run.get_output_folder() + "/flag.txt"
 
     if not os.path.exists(file_path):
@@ -287,7 +290,7 @@ def _extract_submitted_flag(agent_run: AgentRun):
 def _scan_output_for_flag(agent_run: AgentRun):
     """
     Scan the output folder for any files that contain a flag in the expected format.
-    If a flag is found, submit it to CTFd.
+    If a flag is found, submit it for the run.
     """
     flag_format = challmgr.extract_flag_format(agent_run.challenge)
 

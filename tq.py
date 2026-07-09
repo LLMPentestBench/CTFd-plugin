@@ -32,11 +32,11 @@ class TaskQueue:
                     {"_status": AgentRunStatus.INITIATING},
                     synchronize_session=False,
                 )
+                db.session.commit()
                 if rows_matched == 0:
                     gevent.sleep(1)
                     continue
-
-                db.session.commit()
+                
                 logger.info(f"Claimed run {agent_run.id} for processing")
 
                 try:
@@ -53,5 +53,5 @@ class TaskQueue:
             raise RuntimeError("TaskQueue already started")
 
         self._pool = ThreadPool(self._pool_size)
-        for i in range(self._pool_size):
+        for i in range(1, self._pool_size + 1):
             self._pool.spawn(self._worker, i)

@@ -15,6 +15,7 @@ AGENT_RUN_HEARTBEAT_INTERVAL = 1 # seconds
 AGENT_RUN_HEARTBEAT_TIMEOUT = 5 # seconds
 
 class AgentRunStatus(enum.Enum):
+    QUEUED = "queued"
     INITIATING = "initiating"
     RUNNING = "running"
     STOPPED = "stopped"
@@ -46,7 +47,7 @@ class AgentRun(db.Model):
     _status = db.Column('status', db.Enum(AgentRunStatus), nullable=False)
     last_heartbeat = db.Column(db.DateTime, nullable=True)
     
-    creation_time = db.Column(db.DateTime, nullable=False, default=db.func.now())
+    creation_time = db.Column(db.DateTime, nullable=False, default=datetime.datetime.utcnow)
     start_time = db.Column(db.DateTime, nullable=True)
     end_time = db.Column(db.DateTime, nullable=True)
 
@@ -99,27 +100,27 @@ class AgentRun(db.Model):
 
     def mark_running(self):
         self._status = AgentRunStatus.RUNNING
-        self.start_time = db.func.now()
+        self.start_time = datetime.datetime.utcnow()
         db.session.commit()
 
     def mark_stopped(self):
         self._status = AgentRunStatus.STOPPED
-        self.end_time = db.func.now()
+        self.end_time = datetime.datetime.utcnow()
         db.session.commit()
 
     def mark_finished(self):
         self._status = AgentRunStatus.FINISHED
-        self.end_time = db.func.now()
+        self.end_time = datetime.datetime.utcnow()
         db.session.commit()
     
     def mark_timed_out(self):
         self._status = AgentRunStatus.TIMED_OUT
-        self.end_time = db.func.now()
+        self.end_time = datetime.datetime.utcnow()
         db.session.commit()
     
     def mark_errored(self):
         self._status = AgentRunStatus.ERRORED
-        self.end_time = db.func.now()
+        self.end_time = datetime.datetime.utcnow()
         db.session.commit()
     
     def submit_flag(self, flag, correct):

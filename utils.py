@@ -3,9 +3,11 @@ import os
 import importlib
 import inspect
 import re
+import sys
 
 import docker
 import flask
+from flask.helpers import get_debug_flag
 
 docker_client: docker.DockerClient = docker.from_env()
 
@@ -69,3 +71,12 @@ def strip_ansi_escape_sequences(text: str) -> str:
     Strips ANSI escape sequences from the given text.
     """
     return ANSI_STRIP_REGEX.sub('', text)
+
+def detect_early_debug_mode() -> bool:
+    """
+    Detects if the app is running in debug mode, aims to be accurate even early in the app lifecycle.
+
+    Due to CTFd's serve.py, at create_app() time the debug flag is not yet set,
+    therefore this contains an exception checking if the app is started with serve.py (indicating debug mode).
+    """
+    return get_debug_flag() or sys.argv[0].endswith("serve.py")

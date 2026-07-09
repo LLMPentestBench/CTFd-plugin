@@ -28,34 +28,33 @@ logger = logging.getLogger("llmpentestbench.runmgr")
 def _get_container_name(agent_run: AgentRun):
     return "llmptb_" + agent_run.scaffold_id + "_run_" + str(agent_run.id)
 
+def process(agent_run):
+    scaffold = agent_run.scaffold
+    challenge = agent_run.challenge
+
+    agent_run.logger.info(f"Initializing run with scaffold `{scaffold.id}` for challenge {challenge.id}")
+
+    try:
+        sock, run_id = _initialize_run_container(agent_run)
+    except Exception as exc:
+        agent_run.logger.error(f"Exception while initializing run", exc_info=exc)
+        agent_run.mark_errored()
+        return
+
+    try:
+        _monitor_run_container(sock, run_id)
+    except Exception as exc:
+        agent_run.logger.error(f"Exception while monitoring run", exc_info=exc)
+        agent_run.mark_errored()
+        return
+
 def start_run(scaffold: Scaffold, challenge: Challenges):
     challmgr.validate_challenge(challenge) # validate that challenge has flags and the flags are in proper format
-    challenge_id = challenge.id
 
-    @utils.wrap_app_context
-    def run():
-        challenge = Challenges.query.get(challenge_id) # query challenge again to avoid SQLAlchemy session issues due to greenlet context switching
-        agent_run = AgentRun(scaffold_id=scaffold.id, challenge_id=challenge.id, status=AgentRunStatus.INITIATING)
-        db.session.add(agent_run)
-        db.session.commit()
-
-        agent_run.logger.info(f"Initializing run with scaffold `{scaffold.id}` for challenge {challenge.id}")
-
-        try:
-            sock, run_id = _initialize_run_container(agent_run)
-        except Exception as exc:
-            agent_run.logger.error(f"Exception while initializing run", exc_info=exc)
-            agent_run.mark_errored()
-            return
-
-        try:
-            _monitor_run_container(sock, run_id)
-        except Exception as exc:
-            agent_run.logger.error(f"Exception while monitoring run", exc_info=exc)
-            agent_run.mark_errored()
-            return
-
-    gevent.spawn(run)
+    agent_run = AgentRun(scaffold_id=scaffold.id, challenge_id=challenge.id, status=AgentRunStatus.QUEUED)
+    db.session.add(agent_run)
+    db.session.commit()
+    logger.info(f"Queued new run (ID {agent_run.id}) for scaffold `{scaffold.id}` and challenge {challenge.id}")
 
 def user_stop_run(agent_run: AgentRun):
     if agent_run.status != AgentRunStatus.RUNNING:
@@ -102,7 +101,7 @@ def _initialize_run_container(agent_run: AgentRun):
         },
         remove=True, # TODO remove and do manual cleanup, see also _stop_run
     )
-    agent_run.logger.info(f"Container ({container.id[:12]}) started, waiting for initialization")
+    agent_run.logger.info(f"Container ({container.id[:12]}) started, waiting for container readiness")
 
     # Wait for container to be ready, e.g. Docker images loaded
     _wait_for_container_initialization(container, agent_run)

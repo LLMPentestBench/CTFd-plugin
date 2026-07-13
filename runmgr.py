@@ -71,6 +71,9 @@ def _initialize_run_container(agent_run: AgentRun):
     
     # Populate run folder with challenge details
     run_folder = agent_run.get_folder()
+    if os.path.exists(run_folder):
+        raise Exception(f"Run folder {run_folder} already exists for run {run_id}. If the database was reset, please clean up the run folder manually.")
+
     run_input_folder = agent_run.get_input_folder()
     run_output_folder = agent_run.get_output_folder()
     os.mkdir(run_folder)

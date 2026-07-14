@@ -4,12 +4,11 @@ import logging
 from flask import Blueprint, render_template, Response, request, stream_with_context, url_for
 
 from CTFd import CTFdFlask
-from CTFd.plugins.LLMPentestBench import challmgr
 from CTFd.utils.decorators import admins_only, authed_only
 from CTFd.plugins import register_plugin_assets_directory, register_user_page_menu_bar
 from CTFd.models import Challenges
 
-from . import scaffoldmgr, runmgr
+from . import scaffoldmgr, runmgr, challmgr, benchmarkmgr
 from .models import AgentRun
 
 logger = logging.getLogger("llmpentestbench.views")
@@ -40,32 +39,42 @@ def view_create_benchmark():
 
         return render_template('llmpentestbench/admin/create_benchmark.html', scaffolds=scaffolds, challenges=challenges)
     elif request.method == "POST":
-        data = request.get_json(silent=True) or {}
-        scaffold_ids = data.get("scaffolds") or []
-        challenge_ids = data.get("challenges") or []
-        runs_per_pair = data.get("runs_per_pair")
-        stop_condition = data.get("stop_condition")
+        data = request.get_json() or {}
+        scaffold_ids = data.get("scaffolds")
+        challenge_ids = data.get("challenges")
+        display_name = data.get("display_name")
+        attempts = data.get("attempts")
+        stop_after_first_success = data.get("stop_after_first_success")
         time_limit = data.get("time_limit")
 
-        if not scaffold_ids:
-            return {"success": False, "error": "Select at least one scaffold"}, 400
+        if not scaffold_ids or not isinstance(scaffold_ids, list) or not all(isinstance(sid, str) for sid in scaffold_ids):
+            return {"success": False, "error": "Invalid scaffold IDs"}, 400
 
-        if not challenge_ids:
-            return {"success": False, "error": "Select at least one challenge"}, 400
+        if not challenge_ids or not isinstance(challenge_ids, list) or not all(isinstance(cid, int) for cid in challenge_ids):
+            return {"success": False, "error": "Invalid challenge IDs"}, 400
 
-        if not isinstance(runs_per_pair, int) or runs_per_pair < 1:
-            return {"success": False, "error": "Invalid amount of runs"}, 400
+        if not display_name or not isinstance(display_name, str) or len(display_name) == 0:
+            return {"success": False, "error": "Invalid display name"}, 400
+        if len(display_name) > 128:
+            return {"success": False, "error": "Display name is too long"}, 400
 
-        if stop_condition not in {"first_success", "finish_all"}:
-            return {"success": False, "error": "Invalid stop condition"}, 400
+        if not isinstance(attempts, int) or attempts < 1:
+            return {"success": False, "error": "Invalid amount of attempts"}, 400
+
+        if not isinstance(stop_after_first_success, bool):
+            return {"success": False, "error": "Invalid stop after first success value"}, 400
 
         if not isinstance(time_limit, int) or time_limit < 1:
             return {"success": False, "error": "Invalid time limit"}, 400
         
         scaffolds = [scaffoldmgr.get_scaffold(sid) for sid in scaffold_ids]
-        challenges = [Challenges.query.filter_by(id=cid).first() for cid in challenge_ids]
+        challenges = Challenges.query.filter(Challenges.id.in_(challenge_ids)).all()
+        if len(challenges) != len(challenge_ids):
+            return {"success": False, "error": "One or more challenge IDs do not exist"}, 400
 
-        logger.info(f"Received benchmark creation request (scaffolds={scaffold_ids}, challenges={challenge_ids}, runs_per_pair={runs_per_pair}, stop_condition={stop_condition}, time_limit={time_limit})")
+        logger.info(f"Received benchmark creation request (scaffolds={scaffold_ids}, challenges={challenge_ids}, attempts={attempts}, stop_after_first_success={stop_after_first_success}, time_limit={time_limit})")
+
+        benchmarkmgr.create_benchmark(display_name, scaffolds, challenges, attempts, stop_after_first_success, time_limit)
 
         return {"success": True}
 

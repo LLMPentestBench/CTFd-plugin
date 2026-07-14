@@ -21,9 +21,10 @@ function setAllCheckboxes(target, checked) {
 async function createBenchmark() {
   const payload = {
     scaffolds: getSelectedValues(".js-scaffold-checkbox"),
-    challenges: getSelectedValues(".js-challenge-checkbox"),
-    runs_per_pair: Number($("#runs-per-pair").val()),
-    stop_condition: $("input[name='stop_condition']:checked").val(),
+    challenges: getSelectedValues(".js-challenge-checkbox").map(Number),
+    display_name: $("#display-name").val(),
+    attempts: Number($("#attempts").val()),
+    stop_after_first_success: $("input[name='stop_condition']:checked").val() === "first_success",
     time_limit: Number($("#time-limit").val()),
   };
 
@@ -69,7 +70,7 @@ $(".js-deselect-all").click((e) => {
 $(".js-reset-benchmark-form").click((e) => {
   e.preventDefault();
   $(".js-scaffold-checkbox, .js-challenge-checkbox").prop("checked", true);
-  $("#runs-per-pair").val(1);
+  $("#attempts").val(1);
   $("#stop-first-success").prop("checked", true);
   $("#time-limit").val(60);
   $(".js-create-benchmark-status").addClass("d-none").text("");

@@ -43,6 +43,7 @@ class AgentRun(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     challenge_id = db.Column(db.Integer, db.ForeignKey("challenges.id"), nullable=False)
     scaffold_id = db.Column(db.String(64), nullable=False)
+    benchmark = db.Column(db.Integer, db.ForeignKey("llmptb_benchmarks.id"), nullable=True)
 
     _status = db.Column('status', db.Enum(AgentRunStatus), nullable=False)
     last_heartbeat = db.Column(db.DateTime, nullable=True)
@@ -176,6 +177,46 @@ class AgentRunFiles(Files):
 
     def __init__(self, *args, **kwargs):
         super(AgentRunFiles, self).__init__(**kwargs)
+
+class Benchmark(db.Model):
+    __tablename__ = "llmptb_benchmarks"
+
+    id = db.Column(db.Integer, primary_key=True)
+    display_name = db.Column(db.String(128), nullable=False)
+
+    attempts = db.Column(db.Integer, nullable=False)
+    stop_after_first_success = db.Column(db.Boolean, nullable=False)
+    time_limit = db.Column(db.Integer, nullable=False) # seconds
+
+    creation_time = db.Column(db.DateTime, nullable=False, default=datetime.datetime.utcnow)
+
+    challenges = db.relationship(
+        "Challenges",
+        secondary="llmptb_benchmark_challenges",
+        lazy="select",
+    )
+    benchmark_scaffolds = db.relationship("BenchmarkScaffold", lazy="joined")
+    
+    def __init__(self, *args, **kwargs):
+        super(Benchmark, self).__init__(**kwargs)
+
+    @property
+    def scaffolds(self):
+        return [get_scaffold(bs.scaffold_id) for bs in self.benchmark_scaffolds]
+
+class BenchmarkScaffold(db.Model):
+    __tablename__ = "llmptb_benchmark_scaffolds"
+
+    id = db.Column(db.Integer, primary_key=True)
+    benchmark_id = db.Column(db.Integer, db.ForeignKey("llmptb_benchmarks.id"), nullable=False)
+    scaffold_id = db.Column(db.String(64), nullable=False)
+
+class BenchmarkChallenge(db.Model):
+    __tablename__ = "llmptb_benchmark_challenges"
+
+    id = db.Column(db.Integer, primary_key=True)
+    benchmark_id = db.Column(db.Integer, db.ForeignKey("llmptb_benchmarks.id"), nullable=False)
+    challenge_id = db.Column(db.Integer, db.ForeignKey("challenges.id"), nullable=False)
 
 def create_all():
     db.create_all()

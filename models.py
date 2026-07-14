@@ -43,7 +43,8 @@ class AgentRun(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     challenge_id = db.Column(db.Integer, db.ForeignKey("challenges.id"), nullable=False)
     scaffold_id = db.Column(db.String(64), nullable=False)
-    benchmark = db.Column(db.Integer, db.ForeignKey("llmptb_benchmarks.id"), nullable=True)
+    benchmark_id = db.Column(db.Integer, db.ForeignKey("llmptb_benchmarks.id"), nullable=True)
+    benchmark_attempt = db.Column(db.Integer, nullable=True) # which attempt of the benchmark this run is for, starting at 1
 
     _status = db.Column('status', db.Enum(AgentRunStatus), nullable=False)
     last_heartbeat = db.Column(db.DateTime, nullable=True)
@@ -63,6 +64,7 @@ class AgentRun(db.Model):
     llm_total_completion_tokens = db.Column(db.Integer, nullable=True)
     llm_total_time = db.Column(db.Float, nullable=True)
 
+    benchmark = db.relationship("Benchmark", backref="runs", lazy="joined")
     files = db.relationship(
         "AgentRunFiles", backref="run", foreign_keys="AgentRunFiles.run_id", lazy="joined"
     )
@@ -208,15 +210,15 @@ class BenchmarkScaffold(db.Model):
     __tablename__ = "llmptb_benchmark_scaffolds"
 
     id = db.Column(db.Integer, primary_key=True)
-    benchmark_id = db.Column(db.Integer, db.ForeignKey("llmptb_benchmarks.id"), nullable=False)
+    benchmark_id = db.Column(db.Integer, db.ForeignKey("llmptb_benchmarks.id", ondelete="CASCADE"), nullable=False)
     scaffold_id = db.Column(db.String(64), nullable=False)
 
 class BenchmarkChallenge(db.Model):
     __tablename__ = "llmptb_benchmark_challenges"
 
     id = db.Column(db.Integer, primary_key=True)
-    benchmark_id = db.Column(db.Integer, db.ForeignKey("llmptb_benchmarks.id"), nullable=False)
-    challenge_id = db.Column(db.Integer, db.ForeignKey("challenges.id"), nullable=False)
+    benchmark_id = db.Column(db.Integer, db.ForeignKey("llmptb_benchmarks.id", ondelete="CASCADE"), nullable=False)
+    challenge_id = db.Column(db.Integer, db.ForeignKey("challenges.id", ondelete="CASCADE"), nullable=False)
 
 def create_all():
     db.create_all()

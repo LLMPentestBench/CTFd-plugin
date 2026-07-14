@@ -11,14 +11,14 @@ from CTFd.models import db, Challenges
 from CTFd.utils.uploads import get_uploader, hash_file
 
 from . import utils, challmgr, scoremgr
-from .models import AGENT_RUN_HEARTBEAT_INTERVAL, AgentRun, AgentRunStatus, AgentRunFiles
+from .models import AGENT_RUN_HEARTBEAT_INTERVAL, AgentRun, AgentRunStatus, AgentRunFiles, Benchmark
 from .scaffoldmgr import Scaffold
 from .utils import docker_client
 
 DOCKER_RUNTIME = "sysbox-runc"
 DOCKER_NETWORK = "llmptb_proxynet"
 
-CONTAINER_RUN_TIMEOUT = 300 # seconds
+DEFAULT_RUN_TIMEOUT = 300 # seconds
 CONTAINER_INITIALIZATION_TIMEOUT = 60 # seconds
 TERMINAL_COLUMNS = 132
 TERMINAL_ROWS = 24
@@ -31,30 +31,61 @@ def _get_container_name(agent_run: AgentRun):
 def process(agent_run):
     scaffold = agent_run.scaffold
     challenge = agent_run.challenge
+    benchmark = agent_run.benchmark
 
-    agent_run.logger.info(f"Initializing run with scaffold `{scaffold.id}` for challenge {challenge.id}")
+    if benchmark:
+        time_limit = benchmark.time_limit
+        run_name = f"run #{agent_run.benchmark_attempt}"
+    else:
+        time_limit = DEFAULT_RUN_TIMEOUT
+        run_name = "run"
+
+    agent_run.logger.info(f"Initializing {run_name} with scaffold `{scaffold.id}` for challenge {challenge.id}")
 
     try:
-        sock, run_id = _initialize_run_container(agent_run)
+        sock = _initialize_run_container(agent_run)
     except Exception as exc:
         agent_run.logger.error(f"Exception while initializing run", exc_info=exc)
         agent_run.mark_errored()
         return
 
     try:
-        _monitor_run_container(sock, run_id)
+        _monitor_run_container(sock, agent_run, time_limit=time_limit)
     except Exception as exc:
         agent_run.logger.error(f"Exception while monitoring run", exc_info=exc)
         agent_run.mark_errored()
         return
 
-def start_run(scaffold: Scaffold, challenge: Challenges):
+    if benchmark:
+        if agent_run.benchmark_attempt >= benchmark.attempts:
+            agent_run.logger.info(f"{run_name} is the last attempt for benchmark {benchmark.id}, no further attempts will be queued")
+            return
+
+        if benchmark.stop_after_first_success and agent_run.flag_correct:
+            agent_run.logger.info(f"Benchmark {benchmark.id} is set to stop after first success, and {run_name} of scaffold {scaffold.id} and challenge {challenge.id} finished successfully, so skipping remaining attempts")
+            return
+
+        queue_run(scaffold, challenge, benchmark=benchmark, benchmark_attempt=agent_run.benchmark_attempt + 1)
+
+def queue_run(scaffold: Scaffold, challenge: Challenges,
+              benchmark: Benchmark | None = None, benchmark_attempt: int | None = None) -> AgentRun:
     challmgr.validate_challenge(challenge) # validate that challenge has flags and the flags are in proper format
+    if (benchmark is None and benchmark_attempt is not None) or (benchmark is not None and benchmark_attempt is None):
+        raise Exception("Both benchmark and benchmark_attempt must be provided together, or neither")
 
     agent_run = AgentRun(scaffold_id=scaffold.id, challenge_id=challenge.id, status=AgentRunStatus.QUEUED)
+    if benchmark:
+        if benchmark_attempt < 1 or benchmark_attempt > benchmark.attempts:
+            raise Exception(f"Invalid benchmark_attempt {benchmark_attempt} for benchmark {benchmark.id} with {benchmark.attempts} attempts")
+
+        agent_run.benchmark_id = benchmark.id
+        agent_run.benchmark_attempt = benchmark_attempt
+
     db.session.add(agent_run)
     db.session.commit()
-    logger.info(f"Queued new run (ID {agent_run.id}) for scaffold `{scaffold.id}` and challenge {challenge.id}")
+    logger.info(f"Queued new run (ID {agent_run.id}) for scaffold `{scaffold.id}` and challenge {challenge.id}, for benchmark {benchmark.id if benchmark else None} attempt {benchmark_attempt if benchmark_attempt else None}")
+
+    return agent_run
 
 def user_stop_run(agent_run: AgentRun):
     if agent_run.status != AgentRunStatus.RUNNING:
@@ -131,7 +162,7 @@ def _initialize_run_container(agent_run: AgentRun):
     # Fixes https://github.com/LLMPentestBench/CTFd-plugin/issues/48
     sock._sock.setblocking(True)
 
-    return sock, run_id
+    return sock
 
 def _wait_for_container_initialization(container, agent_run: AgentRun):
     deadline = time.monotonic() + CONTAINER_INITIALIZATION_TIMEOUT
@@ -159,8 +190,8 @@ def _wait_for_container_initialization(container, agent_run: AgentRun):
         f"Timed out waiting for systemd in run {agent_run.id}; last status: {last_output}"
     )
 
-def _monitor_run_container(sock, run_id):
-    agent_run = AgentRun.query.get(run_id)
+def _monitor_run_container(sock, agent_run: AgentRun, time_limit: int):
+    run_id = agent_run.id
 
     try:
         container = docker_client.containers.get(_get_container_name(agent_run))
@@ -186,7 +217,7 @@ def _monitor_run_container(sock, run_id):
         def timeout_killer():
             agent_run = AgentRun.query.get(run_id)
             
-            gevent.sleep(CONTAINER_RUN_TIMEOUT)
+            gevent.sleep(time_limit)
             
             agent_run.logger.warning("Run timed out, stopping container")
             agent_run.mark_timed_out()

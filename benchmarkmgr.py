@@ -2,6 +2,7 @@ import logging
 
 from CTFd.models import db, Challenges
 
+from . import runmgr, scaffoldmgr
 from .scaffoldmgr import Scaffold
 from .models import Benchmark, BenchmarkScaffold
 
@@ -34,4 +35,13 @@ def create_benchmark(
         f"attempts {attempts}, stop after first success {stop_after_first_success}, "
         f"time limit {time_limit}"
     )
+
+    queue_benchmark_runs(benchmark)
+
     return benchmark
+
+def queue_benchmark_runs(benchmark: Benchmark):
+    for scaffold in benchmark.scaffolds:
+        for challenge in benchmark.challenges:
+            runmgr.queue_run(scaffold, challenge,
+                             benchmark=benchmark, benchmark_attempt=1)

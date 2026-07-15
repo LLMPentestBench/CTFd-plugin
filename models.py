@@ -44,7 +44,8 @@ class AgentRun(db.Model):
     challenge_id = db.Column(db.Integer, db.ForeignKey("challenges.id"), nullable=False)
     scaffold_id = db.Column(db.String(64), nullable=False)
     benchmark_id = db.Column(db.Integer, db.ForeignKey("llmptb_benchmarks.id"), nullable=True)
-    benchmark_attempt = db.Column(db.Integer, nullable=True) # which attempt of the benchmark this run is for, starting at 1
+    benchmark_attempt = db.Column(db.Integer, nullable=True)
+    # which attempt of the benchmark this run is for, starting at 1. cannot be null if benchmark_id is not null
 
     _status = db.Column('status', db.Enum(AgentRunStatus), nullable=False)
     last_heartbeat = db.Column(db.DateTime, nullable=True)
@@ -165,6 +166,22 @@ class AgentRun(db.Model):
     def logger(self):
         from .runmgr import logger
         return logger.getChild(f"run_{self.id:04d}")
+
+    @property
+    def duration(self) -> datetime.timedelta | None:
+        if self.start_time is None or self.end_time is None:
+            return None
+        return self.end_time - self.start_time
+
+    @property
+    def duration_f(self) -> str | None:
+        if self.duration is None:
+            return None
+        total_seconds = int(self.duration.total_seconds())
+        hours, remainder = divmod(total_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        milliseconds = int(self.duration.microseconds / 1000)
+        return f"{hours:02}:{minutes:02}:{seconds:02}.{milliseconds:03}"
 
 class AgentRunFiles(Files):
     # Give this its own table, to avoid having to edit the CTFd Files table columns

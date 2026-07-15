@@ -36,7 +36,20 @@ def view_config():
 def view_benchmark(benchmark_id):
     benchmark = Benchmark.query.filter_by(id=benchmark_id).first_or_404()
 
-    return render_template('llmpentestbench/admin/benchmark.html', benchmark=benchmark)
+    ordered_runs = sorted(
+        benchmark.runs,
+        key=lambda run: (
+            run.challenge_id,
+            run.scaffold_id,
+            run.benchmark_attempt
+        ),
+    )
+
+    return render_template(
+        'llmpentestbench/admin/benchmark.html',
+        benchmark=benchmark,
+        ordered_runs=ordered_runs,
+    )
 
 @blueprint.route('/admin/llmpentestbench/create_benchmark', methods=["GET", "POST"])
 @admins_only

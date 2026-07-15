@@ -9,7 +9,7 @@ from CTFd.plugins import register_plugin_assets_directory, register_user_page_me
 from CTFd.models import Challenges
 
 from . import scaffoldmgr, runmgr, challmgr, benchmarkmgr
-from .models import AgentRun
+from .models import AgentRun, Benchmark
 
 logger = logging.getLogger("llmpentestbench.views")
 
@@ -26,9 +26,17 @@ blueprint = Blueprint(
 @admins_only
 def view_config():
     scaffolds = scaffoldmgr.get_scaffolds()
-    runs = AgentRun.query.order_by(AgentRun.creation_time.desc()).all()
+    standalone_runs = AgentRun.query.filter(AgentRun.benchmark == None).order_by(AgentRun.creation_time.desc()).all()
+    benchmarks = Benchmark.query.order_by(Benchmark.creation_time.desc()).all()
 
-    return render_template('llmpentestbench/admin/config.html', scaffolds=scaffolds, runs=runs)
+    return render_template('llmpentestbench/admin/config.html', scaffolds=scaffolds, standalone_runs=standalone_runs, benchmarks=benchmarks)
+
+@blueprint.route('/admin/llmpentestbench/benchmark/<benchmark_id>')
+@admins_only
+def view_benchmark(benchmark_id):
+    benchmark = Benchmark.query.filter_by(id=benchmark_id).first_or_404()
+
+    return render_template('llmpentestbench/admin/benchmark.html', benchmark=benchmark)
 
 @blueprint.route('/admin/llmpentestbench/create_benchmark', methods=["GET", "POST"])
 @admins_only

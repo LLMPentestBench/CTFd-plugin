@@ -99,8 +99,8 @@ class AgentRun(db.Model):
             total_time=self.llm_total_time
         )
     
-    def is_finished(self):
-        return self.status != AgentRunStatus.RUNNING
+    def is_done(self):
+        return self.status not in [AgentRunStatus.QUEUED, AgentRunStatus.INITIATING, AgentRunStatus.RUNNING]
 
     def mark_running(self):
         self._status = AgentRunStatus.RUNNING
@@ -222,6 +222,9 @@ class Benchmark(db.Model):
     @property
     def scaffolds(self):
         return [get_scaffold(bs.scaffold_id) for bs in self.benchmark_scaffolds]
+    
+    def is_done(self):
+        return all(run.is_done() for run in self.runs)
 
 class BenchmarkScaffold(db.Model):
     __tablename__ = "llmptb_benchmark_scaffolds"

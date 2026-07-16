@@ -5,7 +5,7 @@ import datetime
 
 from CTFd.models import Challenges, Files, db
 
-from .scaffoldmgr import get_scaffold
+from .scaffoldmgr import get_scaffold, Scaffold
 
 AGENT_RUNS_FOLDER = os.path.join(os.path.dirname(__file__), "runs")
 if not os.path.exists(AGENT_RUNS_FOLDER):
@@ -43,6 +43,7 @@ class AgentRun(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     challenge_id = db.Column(db.Integer, db.ForeignKey("challenges.id"), nullable=False)
     scaffold_id = db.Column(db.String(64), nullable=False)
+    model = db.Column(db.String(64), nullable=False)
     benchmark_id = db.Column(db.Integer, db.ForeignKey("llmptb_benchmarks.id"), nullable=True)
     benchmark_attempt = db.Column(db.Integer, nullable=True)
     # which attempt of the benchmark this run is for, starting at 1. cannot be null if benchmark_id is not null
@@ -70,9 +71,10 @@ class AgentRun(db.Model):
         "AgentRunFiles", backref="run", foreign_keys="AgentRunFiles.run_id", lazy="joined"
     )
 
-    def __init__(self, scaffold_id, challenge_id, status):
+    def __init__(self, scaffold_id, challenge_id, model, status):
         self.scaffold_id = scaffold_id
         self.challenge_id = challenge_id
+        self.model = model
         self._status = status
 
     @property
@@ -215,13 +217,18 @@ class Benchmark(db.Model):
         lazy="select",
     )
     benchmark_scaffolds = db.relationship("BenchmarkScaffold", lazy="joined")
-    
+    models = db.relationship("BenchmarkModel", lazy="joined")
+
     def __init__(self, *args, **kwargs):
         super(Benchmark, self).__init__(**kwargs)
 
     @property
-    def scaffolds(self):
+    def scaffolds(self) -> list['Scaffold']:
         return [get_scaffold(bs.scaffold_id) for bs in self.benchmark_scaffolds]
+
+    @property
+    def models(self) -> list[str]:
+        return [bm.model_name for bm in self.models]
     
     def is_done(self):
         return all(run.is_done() for run in self.runs)
@@ -239,6 +246,13 @@ class BenchmarkChallenge(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     benchmark_id = db.Column(db.Integer, db.ForeignKey("llmptb_benchmarks.id", ondelete="CASCADE"), nullable=False)
     challenge_id = db.Column(db.Integer, db.ForeignKey("challenges.id", ondelete="CASCADE"), nullable=False)
+
+class BenchmarkModel(db.Model):
+    __tablename__ = "llmptb_benchmark_models"
+
+    id = db.Column(db.Integer, primary_key=True)
+    benchmark_id = db.Column(db.Integer, db.ForeignKey("llmptb_benchmarks.id", ondelete="CASCADE"), nullable=False)
+    model_name = db.Column(db.Text, nullable=False)
 
 def create_all():
     db.create_all()

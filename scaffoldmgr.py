@@ -24,6 +24,9 @@ class Scaffold(abc.ABC):
     def get_litellm_key_alias(self) -> str:
         ...
 
+    def set_llm_key_command(self, llm_key: str) -> str:
+        ...
+
     def get_command(self, challenge: Challenges) -> str:
         ...
 

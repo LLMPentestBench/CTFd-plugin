@@ -10,7 +10,7 @@ import docker
 from CTFd.models import db, Challenges
 from CTFd.utils.uploads import get_uploader, hash_file
 
-from . import utils, challmgr, scoremgr
+from . import utils, challmgr, litellmmgr
 from .models import AGENT_RUN_HEARTBEAT_INTERVAL, AgentRun, AgentRunStatus, AgentRunFiles, Benchmark
 from .scaffoldmgr import Scaffold
 from .utils import docker_client
@@ -65,15 +65,15 @@ def process(agent_run):
             agent_run.logger.info(f"Benchmark {benchmark.id} is set to stop after first success, and {run_name} of scaffold {scaffold.id} and challenge {challenge.id} finished successfully, so skipping remaining attempts")
             return
 
-        queue_run(scaffold, challenge, benchmark=benchmark, benchmark_attempt=agent_run.benchmark_attempt + 1)
+        queue_run(scaffold, challenge, model=agent_run.model, benchmark=benchmark, benchmark_attempt=agent_run.benchmark_attempt + 1)
 
-def queue_run(scaffold: Scaffold, challenge: Challenges,
+def queue_run(scaffold: Scaffold, challenge: Challenges, model: str,
               benchmark: Benchmark | None = None, benchmark_attempt: int | None = None) -> AgentRun:
     challmgr.validate_challenge(challenge) # validate that challenge has flags and the flags are in proper format
     if (benchmark is None and benchmark_attempt is not None) or (benchmark is not None and benchmark_attempt is None):
         raise Exception("Both benchmark and benchmark_attempt must be provided together, or neither")
 
-    agent_run = AgentRun(scaffold_id=scaffold.id, challenge_id=challenge.id, status=AgentRunStatus.QUEUED)
+    agent_run = AgentRun(scaffold_id=scaffold.id, challenge_id=challenge.id, model=model, status=AgentRunStatus.QUEUED)
     if benchmark:
         if benchmark_attempt < 1 or benchmark_attempt > benchmark.attempts:
             raise Exception(f"Invalid benchmark_attempt {benchmark_attempt} for benchmark {benchmark.id} with {benchmark.attempts} attempts")
@@ -137,6 +137,8 @@ def _initialize_run_container(agent_run: AgentRun):
     )
     agent_run.logger.info(f"Container ({container.id[:12]}) started, waiting for container readiness")
 
+    set_container_llm_key(container, scaffold, agent_run.model)
+
     # Wait for container to be ready, e.g. Docker images loaded
     _wait_for_container_initialization(container, agent_run)
 
@@ -163,6 +165,14 @@ def _initialize_run_container(agent_run: AgentRun):
     sock._sock.setblocking(True)
 
     return sock
+
+def set_container_llm_key(container, scaffold: Scaffold, model: str):
+    llm_key = litellmmgr.get_litellm_key_for_scaffold(scaffold, model)
+
+    command = scaffold.set_llm_key_command(llm_key)
+    exit_code, output = container.exec_run(command)
+    if exit_code != 0:
+        raise Exception(f"Failed to set LLM key in container {container.name} (exit code {exit_code}): {output.decode().strip()}")
 
 def _wait_for_container_initialization(container, agent_run: AgentRun):
     deadline = time.monotonic() + CONTAINER_INITIALIZATION_TIMEOUT
@@ -256,7 +266,7 @@ def _monitor_run_container(sock, agent_run: AgentRun, time_limit: int):
     else:
         _extract_submitted_flag(agent_run)
     
-    llm_stats = scoremgr.get_run_llm_statistics(agent_run, container_ip_address, current_time_instead_of_end_time=True)
+    llm_stats = litellmmgr.get_run_llm_statistics(agent_run, container_ip_address, current_time_instead_of_end_time=True)
     agent_run.set_llm_statistics(llm_stats)
     
     _upload_run_files(agent_run)

@@ -95,7 +95,9 @@ def view_create_benchmark():
 
         logger.info(f"Received benchmark creation request (scaffolds={scaffold_ids}, challenges={challenge_ids}, attempts={attempts}, stop_after_first_success={stop_after_first_success}, time_limit={time_limit})")
 
-        benchmarkmgr.create_benchmark(display_name, scaffolds, challenges, attempts, stop_after_first_success, time_limit)
+        models = ["togetherai-minimax-m3"] # TODO
+
+        benchmarkmgr.create_benchmark(display_name, scaffolds, challenges, models, attempts, stop_after_first_success, time_limit)
 
         return {"success": True}
 
@@ -133,6 +135,8 @@ def run_challenge(scaffold_id):
         return {"success": False, "error": "Invalid scaffold_id"}, 400
     
     challenge_id = "1"  # TODO: Replace with actual challenge selection logic
+    model = "togetherai-minimax-m3"  # TODO: Replace with actual model selection logic
+
     challenge = Challenges.query.filter_by(id=challenge_id).first()
     if not challenge:
         return {"success": False, "error": f"Challenge with id {challenge_id} does not exist"}, 400
@@ -140,7 +144,7 @@ def run_challenge(scaffold_id):
     try:
         challmgr.validate_challenge(challenge)
 
-        runmgr.queue_run(scaffold, challenge)
+        runmgr.queue_run(scaffold, challenge, model)
         return {"success": True}
     except Exception as e:
         logger.error(f"Error starting run for scaffold {scaffold_id}", exc_info=e)

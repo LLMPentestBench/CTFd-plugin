@@ -4,7 +4,7 @@ from CTFd.models import db, Challenges
 
 from . import runmgr, scaffoldmgr
 from .scaffoldmgr import Scaffold
-from .models import Benchmark, BenchmarkScaffold
+from .models import Benchmark, BenchmarkModel, BenchmarkScaffold
 
 logger = logging.getLogger("llmpentestbench.benchmarkmgr")
 
@@ -12,6 +12,7 @@ def create_benchmark(
     display_name: str,
     scaffolds: list[Scaffold],
     challenges: list[Challenges],
+    models: list[str],
     attempts: int,
     stop_after_first_success: bool,
     time_limit: int,
@@ -25,6 +26,9 @@ def create_benchmark(
             BenchmarkScaffold(scaffold_id=scaffold.id) for scaffold in scaffolds
         ],
         challenges=challenges,
+        models=[
+            BenchmarkModel(model_name=model) for model in models
+        ]
     )
     db.session.add(benchmark)
     db.session.commit()
@@ -43,5 +47,6 @@ def create_benchmark(
 def queue_benchmark_runs(benchmark: Benchmark):
     for scaffold in benchmark.scaffolds:
         for challenge in benchmark.challenges:
-            runmgr.queue_run(scaffold, challenge,
-                             benchmark=benchmark, benchmark_attempt=1)
+            for model in benchmark.models:
+                runmgr.queue_run(scaffold, challenge, model,
+                                benchmark=benchmark, benchmark_attempt=1)

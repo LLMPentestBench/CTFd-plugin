@@ -217,7 +217,7 @@ class Benchmark(db.Model):
         lazy="select",
     )
     benchmark_scaffolds = db.relationship("BenchmarkScaffold", lazy="joined")
-    models = db.relationship("BenchmarkModel", lazy="joined")
+    benchmark_models = db.relationship("BenchmarkModel", lazy="joined")
 
     def __init__(self, *args, **kwargs):
         super(Benchmark, self).__init__(**kwargs)
@@ -228,7 +228,7 @@ class Benchmark(db.Model):
 
     @property
     def models(self) -> list[str]:
-        return [bm.model_name for bm in self.models]
+        return [bm.model_name for bm in self.benchmark_models]
     
     def is_done(self):
         return all(run.is_done() for run in self.runs)

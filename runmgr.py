@@ -167,7 +167,7 @@ def _initialize_run_container(agent_run: AgentRun):
     return sock
 
 def set_container_llm_key(container, scaffold: Scaffold, model: str):
-    llm_key = litellmmgr.get_litellm_key_for_scaffold(scaffold, model)
+    llm_key = litellmmgr.get_key_for_scaffold(scaffold, model)
 
     command = scaffold.set_llm_key_command(llm_key)
     exit_code, output = container.exec_run(command)

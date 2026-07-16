@@ -26,7 +26,7 @@ def create_benchmark(
             BenchmarkScaffold(scaffold_id=scaffold.id) for scaffold in scaffolds
         ],
         challenges=challenges,
-        models=[
+        benchmark_models=[
             BenchmarkModel(model_name=model) for model in models
         ]
     )

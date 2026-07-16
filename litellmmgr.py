@@ -108,13 +108,14 @@ def delete_key(key_alias: str):
     if req.status_code != 200:
         raise Exception(f"Failed to delete LiteLLM key for alias {key_alias}: {req.status_code} - {req.text}")
 
-def get_litellm_key_for_scaffold(scaffold: Scaffold, model: str) -> str:
+def get_key_for_scaffold(scaffold: Scaffold, model: str) -> str:
     """
     Returns the LiteLLM key for a given scaffold.
     """
     litellm_key_alias = f"llmptb-{scaffold.id}-{model}"
     internal_alias = scaffold.get_litellm_key_alias()
 
+    # TODO this behavior will break if scaffold+model is run twice at the same time
     if key_exists(litellm_key_alias):
         delete_key(litellm_key_alias)
         logger.info(f"Deleted existing LiteLLM key for scaffold {scaffold.id} and model {model}")
@@ -132,3 +133,16 @@ def get_litellm_key_for_scaffold(scaffold: Scaffold, model: str) -> str:
     key = data.get("key")
 
     return key
+
+def list_models() -> list[str]:
+    """
+    Returns a list of all available models in LiteLLM.
+    """
+    req = requests.get(f"{LITELLM_HOST}/models", headers={"Authorization": f"Bearer {LITELLM_KEY}"})
+
+    if req.status_code != 200:
+        raise Exception(f"Failed to fetch LiteLLM models: {req.status_code} - {req.text}")
+    
+    data = req.json()
+
+    return [model['id'] for model in data['data'] if model['object'] == 'model']

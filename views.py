@@ -8,7 +8,7 @@ from CTFd.utils.decorators import admins_only, authed_only
 from CTFd.plugins import register_plugin_assets_directory, register_user_page_menu_bar
 from CTFd.models import Challenges
 
-from . import scaffoldmgr, runmgr, challmgr, benchmarkmgr
+from . import scaffoldmgr, runmgr, challmgr, benchmarkmgr, litellmmgr
 from .models import AgentRun, Benchmark
 
 logger = logging.getLogger("llmpentestbench.views")
@@ -57,11 +57,13 @@ def view_create_benchmark():
     if request.method == "GET":
         scaffolds = scaffoldmgr.get_scaffolds()
         challenges = Challenges.query.all()
+        models = litellmmgr.list_models()
 
-        return render_template('llmpentestbench/admin/create_benchmark.html', scaffolds=scaffolds, challenges=challenges)
+        return render_template('llmpentestbench/admin/create_benchmark.html', scaffolds=scaffolds, challenges=challenges, models=models)
     elif request.method == "POST":
         data = request.get_json() or {}
         scaffold_ids = data.get("scaffolds")
+        model_names = data.get("models")
         challenge_ids = data.get("challenges")
         display_name = data.get("display_name")
         attempts = data.get("attempts")
@@ -73,6 +75,9 @@ def view_create_benchmark():
 
         if not challenge_ids or not isinstance(challenge_ids, list) or not all(isinstance(cid, int) for cid in challenge_ids):
             return {"success": False, "error": "Invalid challenge IDs"}, 400
+
+        if not model_names or not isinstance(model_names, list) or not all(isinstance(model, str) for model in model_names):
+            return {"success": False, "error": "Invalid model names"}, 400
 
         if not display_name or not isinstance(display_name, str) or len(display_name) == 0:
             return {"success": False, "error": "Invalid display name"}, 400
@@ -93,11 +98,15 @@ def view_create_benchmark():
         if len(challenges) != len(challenge_ids):
             return {"success": False, "error": "One or more challenge IDs do not exist"}, 400
 
-        logger.info(f"Received benchmark creation request (scaffolds={scaffold_ids}, challenges={challenge_ids}, attempts={attempts}, stop_after_first_success={stop_after_first_success}, time_limit={time_limit})")
+        available_models = set(litellmmgr.list_models())
+        if any(model not in available_models for model in model_names):
+            return {"success": False, "error": "One or more model names do not exist"}, 400
 
-        models = ["togetherai-minimax-m3"] # TODO
+        logger.info(
+            f"Received benchmark creation request (scaffolds={scaffold_ids}, challenges={challenge_ids}, models={model_names}, attempts={attempts}, stop_after_first_success={stop_after_first_success}, time_limit={time_limit})"
+        )
 
-        benchmarkmgr.create_benchmark(display_name, scaffolds, challenges, models, attempts, stop_after_first_success, time_limit)
+        benchmarkmgr.create_benchmark(display_name, scaffolds, challenges, model_names, attempts, stop_after_first_success, time_limit)
 
         return {"success": True}
 

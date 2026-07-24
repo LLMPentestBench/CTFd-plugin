@@ -102,37 +102,43 @@ def key_exists(key_alias: str) -> bool:
     
     return key_alias in data['aliases']
 
-def delete_key(key_alias: str):
-    req = requests.post(f"{LITELLM_HOST}/key/delete", headers={"Authorization": f"Bearer {LITELLM_KEY}"}, json={"key_aliases": [key_alias]})
-
-    if req.status_code != 200:
-        raise Exception(f"Failed to delete LiteLLM key for alias {key_alias}: {req.status_code} - {req.text}")
-
-def get_key_for_scaffold(scaffold: Scaffold, model: str) -> str:
+def create_key_for_run(run: AgentRun) -> str:
     """
-    Returns the LiteLLM key for a given scaffold.
+    Returns the LiteLLM key for a given run.
     """
-    litellm_key_alias = f"llmptb-{scaffold.id}-{model}"
-    internal_alias = scaffold.get_litellm_key_alias()
+    litellm_key_alias = f"llmptb-{run.id}"
+    internal_alias = run.scaffold.get_litellm_key_alias()
 
-    # TODO this behavior will break if scaffold+model is run twice at the same time
     if key_exists(litellm_key_alias):
-        delete_key(litellm_key_alias)
-        logger.info(f"Deleted existing LiteLLM key for scaffold {scaffold.id} and model {model}")
+        delete_key_alias(litellm_key_alias)
 
     req = requests.post(f"{LITELLM_HOST}/key/generate", headers={"Authorization": f"Bearer {LITELLM_KEY}", "Content-Type": "application/json"}, json={
         "models": [internal_alias],
-        "aliases": {internal_alias: model},
+        "aliases": {internal_alias: run.model},
         "key_alias": litellm_key_alias,
     })
 
     if req.status_code != 200:
-        raise Exception(f"Failed to generate LiteLLM key for scaffold {scaffold.id}: {req.status_code} - {req.text}")
+        raise Exception(f"Failed to generate LiteLLM key for run {run.id}: {req.status_code} - {req.text}")
     
     data = req.json()
     key = data.get("key")
 
     return key
+
+def delete_key_for_run(run: AgentRun):
+    """
+    Deletes the LiteLLM key for a given run.
+    """
+    litellm_key_alias = f"llmptb-{run.id}"
+
+    delete_key_alias(litellm_key_alias)
+
+def delete_key_alias(key_alias: str):
+    req = requests.post(f"{LITELLM_HOST}/key/delete", headers={"Authorization": f"Bearer {LITELLM_KEY}"}, json={"key_aliases": [key_alias]})
+
+    if req.status_code != 200:
+        raise Exception(f"Failed to delete LiteLLM key for alias {key_alias}: {req.status_code} - {req.text}")
 
 def list_models() -> list[str]:
     """

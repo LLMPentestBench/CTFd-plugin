@@ -13,6 +13,9 @@ class ExampleScaffold(Scaffold):
 
     def get_litellm_key_alias(self):
         return "example"
+    
+    def set_llm_key_command(self, llm_key: str) -> str:
+        return "true"
 
     def get_command(self, challenge) -> str:
         return "/entrypoint"

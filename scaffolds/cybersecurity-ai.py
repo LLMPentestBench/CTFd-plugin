@@ -14,6 +14,9 @@ class CybersecurityAi(Scaffold):
     def get_litellm_key_alias(self):
         return "cybersecurity-ai"
 
+    def set_llm_key_command(self, llm_key: str) -> str:
+        return f"/root/set_key.sh {llm_key}"
+
     def get_command(self, challenge) -> str:
         return "cai \"Use the generic_linux_command tool only without a session argument. Test https://beginner-chall.tptech.nl/\""
         # TODO look into src/cai/sdk/agents/run.py L407 run_streamed

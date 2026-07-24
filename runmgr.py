@@ -137,7 +137,7 @@ def _initialize_run_container(agent_run: AgentRun):
     )
     agent_run.logger.info(f"Container ({container.id[:12]}) started, waiting for container readiness")
 
-    set_container_llm_key(container, scaffold, agent_run.model)
+    set_container_llm_key(container, agent_run)
 
     # Wait for container to be ready, e.g. Docker images loaded
     _wait_for_container_initialization(container, agent_run)
@@ -166,10 +166,10 @@ def _initialize_run_container(agent_run: AgentRun):
 
     return sock
 
-def set_container_llm_key(container, scaffold: Scaffold, model: str):
-    llm_key = litellmmgr.get_key_for_scaffold(scaffold, model)
+def set_container_llm_key(container, agent_run: AgentRun):
+    llm_key = litellmmgr.create_key_for_run(agent_run)
 
-    command = scaffold.set_llm_key_command(llm_key)
+    command = agent_run.scaffold.set_llm_key_command(llm_key)
     exit_code, output = container.exec_run(command)
     if exit_code != 0:
         raise Exception(f"Failed to set LLM key in container {container.name} (exit code {exit_code}): {output.decode().strip()}")
@@ -248,6 +248,8 @@ def _monitor_run_container(sock, agent_run: AgentRun, time_limit: int):
             sock.close()
     finally:
         _stop_run(agent_run)
+
+        litellmmgr.delete_key_for_run(agent_run)
 
     db.session.refresh(agent_run)
 

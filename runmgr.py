@@ -2,6 +2,7 @@ import json
 import os
 import logging
 import re
+import shlex
 import time
 from pathlib import Path
 
@@ -148,9 +149,11 @@ def _initialize_run_container(agent_run: AgentRun):
 
     agent_run.logger.info(f"Initialization complete, executing scaffold command")
 
-    command = scaffold.get_command(challenge)
+    scaffold_command = scaffold.get_command(challenge)
+    command = shlex.join(["bash", "--login", "-c", scaffold_command])
+    agent_run.logger.info(f"Executing command in container: {command}")
     _, sock = container.exec_run(
-        f"bash --login -c '{command}'",
+        command,
         stdin=True,
         tty=True,
         socket=True,

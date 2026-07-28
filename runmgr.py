@@ -150,8 +150,10 @@ def _initialize_run_container(agent_run: AgentRun):
     agent_run.logger.info(f"Initialization complete, executing scaffold command")
 
     scaffold_command = scaffold.get_command(challenge)
+    if isinstance(scaffold_command, list):
+        scaffold_command = shlex.join(scaffold_command)
+
     command = shlex.join(["bash", "--login", "-c", scaffold_command])
-    agent_run.logger.info(f"Executing command in container: {command}")
     _, sock = container.exec_run(
         command,
         stdin=True,

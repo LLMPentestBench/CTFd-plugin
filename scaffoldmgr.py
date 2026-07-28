@@ -27,7 +27,7 @@ class Scaffold(abc.ABC):
     def set_llm_key_command(self, llm_key: str) -> str:
         ...
 
-    def get_command(self, challenge: Challenges) -> str:
+    def get_command(self, challenge: Challenges) -> str | list[str]:
         ...
 
     def is_available(self) -> bool:

@@ -3,10 +3,10 @@ import logging
 from datetime import datetime
 
 from .models import AgentRun, AgentRunLLMStatistics
-from .scaffoldmgr import Scaffold
 
 LITELLM_HOST = "http://localhost:4000"
 LITELLM_KEY = "sk-M7lSa-wbdMaT6VtYLZYldQ" # TODO not hardcoded
+EMBEDDER_MODEL_NAME = "openai-text-embedding-3-small"
 
 LITELLM_SPEND_LOGS_FETCH_PAGE_SIZE = 100 # max 100
 
@@ -113,8 +113,11 @@ def create_key_for_run(run: AgentRun) -> str:
         delete_key_alias(litellm_key_alias)
 
     req = requests.post(f"{LITELLM_HOST}/key/generate", headers={"Authorization": f"Bearer {LITELLM_KEY}", "Content-Type": "application/json"}, json={
-        "models": [internal_alias],
-        "aliases": {internal_alias: run.model},
+        "models": [internal_alias, "embedding-model"],
+        "aliases": {
+            internal_alias: run.model,
+            "embedding-model": EMBEDDER_MODEL_NAME
+        },
         "key_alias": litellm_key_alias,
     })
 

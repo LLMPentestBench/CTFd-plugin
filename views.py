@@ -143,7 +143,7 @@ def run_challenge(scaffold_id):
     if not scaffold:
         return {"success": False, "error": "Invalid scaffold_id"}, 400
     
-    challenge_id = "1"  # TODO: Replace with actual challenge selection logic
+    challenge_id = "3"  # TODO: Replace with actual challenge selection logic
     model = "togetherai-minimax-m3"  # TODO: Replace with actual model selection logic
 
     challenge = Challenges.query.filter_by(id=challenge_id).first()

@@ -4,12 +4,22 @@ import importlib
 import inspect
 import re
 import sys
+import threading
 
 import docker
 import flask
 from flask.helpers import get_debug_flag
 
-docker_client: docker.DockerClient = docker.from_env()
+_docker_client = threading.local()
+
+def get_docker_client() -> docker.DockerClient:
+    """
+    Returns a Docker client instance.
+    Do not reuse the instance across threads, call this function from the other thread instead.
+    """
+    if not hasattr(_docker_client, "client"):
+        _docker_client.client = docker.from_env()
+    return _docker_client.client
 
 def load_modules(folder: str) -> list:
     """

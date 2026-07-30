@@ -5,7 +5,7 @@ import logging
 from CTFd.models import Challenges
 
 from . import utils
-from .utils import docker_client
+from .utils import get_docker_client
 
 _scaffolds: dict[str, 'Scaffold']
 logger = logging.getLogger("llmpentestbench.scaffoldmgr")
@@ -44,7 +44,7 @@ class Scaffold(abc.ABC):
         ...
 
     def is_available(self) -> bool:
-        return docker_client.images.list(name=self.get_image_name()) != []
+        return get_docker_client().images.list(name=self.get_image_name()) != []
     
     def use_output_flag_scanning(self) -> bool:
         """

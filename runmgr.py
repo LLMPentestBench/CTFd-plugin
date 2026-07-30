@@ -14,7 +14,7 @@ from CTFd.utils.uploads import get_uploader, hash_file
 from . import utils, challmgr, litellmmgr
 from .models import AGENT_RUN_HEARTBEAT_INTERVAL, AgentRun, AgentRunStatus, AgentRunFiles, Benchmark
 from .scaffoldmgr import Scaffold
-from .utils import docker_client
+from .utils import get_docker_client
 
 DOCKER_RUNTIME = "sysbox-runc"
 DOCKER_NETWORK = "llmptb_proxynet"
@@ -113,7 +113,7 @@ def _initialize_run_container(agent_run: AgentRun):
     os.mkdir(run_output_folder)
 
     container_name = _get_container_name(agent_run)
-    container = docker_client.containers.run(
+    container = get_docker_client().containers.run(
         scaffold.get_image_name(),
         detach=True,
         tty=True,
@@ -365,7 +365,7 @@ def _stop_run(agent_run: AgentRun):
     try:
         container_name = _get_container_name(agent_run)
         try:
-            container = docker_client.containers.get(container_name)
+            container = get_docker_client().containers.get(container_name)
         except docker.errors.NotFound:
             return
 
@@ -426,7 +426,7 @@ def cleanup_containers():
     """
     Cleanup any leftover containers from runs that were not properly stopped (e.g. due to CTFd crash). Should be called on plugin load.
     """
-    for container in docker_client.containers.list(all=True, filters={"label": "llmptb_run"}):
+    for container in get_docker_client().containers.list(all=True, filters={"label": "llmptb_run"}):
         try:
             run_id = int(container.labels.get("llmptb_run"))
             agent_run = AgentRun.query.get(run_id)

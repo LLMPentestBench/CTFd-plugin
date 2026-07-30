@@ -19,15 +19,28 @@ class Scaffold(abc.ABC):
         self.name = name
 
     def get_image_name(self):
+        """
+        Returns the name of the Docker image for this scaffold.
+        """
         ...
     
-    def get_litellm_key_alias(self) -> str:
+    def get_internal_model_name(self) -> str:
+        """
+        The internal model name that is used for LLM queries.
+        This name will be mapped to the correct model at runtime.
+        """
         ...
 
     def set_llm_key_command(self, llm_key: str) -> str:
+        """
+        Returns the command to set the LiteLLM key in the scaffold container.
+        """
         ...
 
     def get_command(self, challenge: Challenges) -> str | list[str]:
+        """
+        Returns the command to run the scaffold container for a given challenge.
+        """
         ...
 
     def is_available(self) -> bool:

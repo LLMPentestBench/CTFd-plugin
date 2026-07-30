@@ -208,12 +208,6 @@ def _wait_for_container_initialization(container, agent_run: AgentRun):
 def _monitor_run_container(sock, agent_run: AgentRun, time_limit: int):
     run_id = agent_run.id
 
-    try:
-        container = docker_client.containers.get(_get_container_name(agent_run))
-        container_ip_address = container.attrs['NetworkSettings']['Networks'][DOCKER_NETWORK]['IPAddress']
-    except Exception as exc:
-        raise Exception(f"Failed to get container IP address for run {run_id}") from exc
-
     run_folder = agent_run.get_folder()
     log_file_path = f"{run_folder}/output.log"
 
@@ -272,8 +266,14 @@ def _monitor_run_container(sock, agent_run: AgentRun, time_limit: int):
         _scan_output_for_flag(agent_run)
     else:
         _extract_submitted_flag(agent_run)
+
+    # TODO: remove and find better solution
+    # Problem is that LiteLLM proxy doesn't instantly have the logs available via the API,
+    #   so the LLM statistics are incomplete if done directly
+    from time import sleep
+    sleep(5)
     
-    llm_stats = litellmmgr.get_run_llm_statistics(agent_run, container_ip_address, current_time_instead_of_end_time=True)
+    llm_stats = litellmmgr.get_run_llm_statistics(agent_run)
     agent_run.set_llm_statistics(llm_stats)
     
     _upload_run_files(agent_run)

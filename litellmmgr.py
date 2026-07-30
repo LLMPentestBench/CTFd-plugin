@@ -12,24 +12,23 @@ LITELLM_SPEND_LOGS_FETCH_PAGE_SIZE = 100 # max 100
 
 logger = logging.getLogger("llmpentestbench.litellmmgr")
 
-def get_run_llm_statistics(run: "AgentRun", ip_address: str, current_time_instead_of_end_time: bool = False) -> "AgentRunLLMStatistics":
+def get_key_alias_for_run(run: AgentRun) -> str:
+    """
+    Returns the LiteLLM key alias for a given run.
+    """
+    return f"llmptb-{run.id}"
+
+def get_run_llm_statistics(run: "AgentRun") -> "AgentRunLLMStatistics":
     """
     Fetches the LLM statistics for a given AgentRun from LiteLLM,
     filtering based on the LiteLLM key, the container's IP address and the run's time range.
 
     In case the container is still running, set current_time_instead_of_end_time to True.
     """
-    key_alias = run.scaffold.get_litellm_key_alias()
-    run_ip = ip_address
+    key_alias = get_key_alias_for_run(run)
     start_date = run.start_time
-
-    if current_time_instead_of_end_time:
-        end_date = datetime.utcnow()
-    else:
-        end_date = run.end_time
-        if end_date is None:
-            raise ValueError(f"Run {run.id} has no end_time set, and current_time_instead_of_end_time is False. Cannot fetch LLM statistics.")
-
+    end_date = datetime(2099, 12, 31)
+    
     start_date_f = start_date.strftime("%Y-%m-%d %H:%M:%S").replace(" ", "%20")
     end_date_f = end_date.strftime("%Y-%m-%d %H:%M:%S").replace(" ", "%20")
     logger.info(f"Fetching spend logs for run {run.id} from LiteLLM between {start_date} and {end_date}")
@@ -55,11 +54,6 @@ def get_run_llm_statistics(run: "AgentRun", ip_address: str, current_time_instea
         logger.info(f"Fetched {len(entries)} spend log entries from LiteLLM for run {run.id} (page {page})")
 
         for entry in entries:
-            ip = entry.get('requester_ip_address')
-            if ip != run_ip:
-                logger.warning(f"Skipping entry with IP {ip} for run {run.id} (expected {run_ip})")
-                continue
-
             calls_total += 1
             total_spend += entry.get("spend", 0)
             total_prompt_tokens += entry.get("prompt_tokens", 0)
@@ -106,8 +100,8 @@ def create_key_for_run(run: AgentRun) -> str:
     """
     Returns the LiteLLM key for a given run.
     """
-    litellm_key_alias = f"llmptb-{run.id}"
-    internal_alias = run.scaffold.get_litellm_key_alias()
+    litellm_key_alias = get_key_alias_for_run(run)
+    internal_alias = run.scaffold.get_internal_model_name()
 
     if key_exists(litellm_key_alias):
         delete_key_alias(litellm_key_alias)

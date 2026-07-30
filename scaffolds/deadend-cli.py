@@ -17,7 +17,7 @@ class DeadendCLI(Scaffold):
     def get_image_name(self):
         return f"ghcr.io/llmpentestbench/agent-deadend:latest"
 
-    def get_litellm_key_alias(self):
+    def get_internal_model_name(self):
         return "deadend-cli"
 
     def set_llm_key_command(self, llm_key: str) -> str:

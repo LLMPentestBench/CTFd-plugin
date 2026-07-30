@@ -11,7 +11,7 @@ class ExampleScaffold(Scaffold):
     def get_image_name(self):
         return f"ghcr.io/llmpentestbench/agent-example:latest"
 
-    def get_litellm_key_alias(self):
+    def get_internal_model_name(self):
         return "example"
     
     def set_llm_key_command(self, llm_key: str) -> str:

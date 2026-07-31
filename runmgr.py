@@ -18,6 +18,7 @@ from .utils import get_docker_client
 
 DOCKER_RUNTIME = "sysbox-runc"
 DOCKER_NETWORK = "llmptb_proxynet"
+LITELLM_DATA_FETCH_DELAY = 10 # seconds
 
 DEFAULT_RUN_TIMEOUT = 300 # seconds
 CONTAINER_INITIALIZATION_TIMEOUT = 60 # seconds
@@ -292,6 +293,11 @@ def _monitor_run_container(sock, agent_run: AgentRun, time_limit: int):
         sock.close()
 
 def _finalize_run(agent_run: AgentRun):
+    """
+    Stops the run, cleans up any resources and extracts the flag and other artifacts.
+
+    Keep in mind that this function may delay due to I/O operations.
+    """
     _stop_run(agent_run) # stop if not stopped already
     
     litellmmgr.delete_key_for_run(agent_run)
@@ -313,20 +319,26 @@ def _finalize_run(agent_run: AgentRun):
         _scan_output_for_flag(agent_run)
     else:
         _extract_submitted_flag(agent_run)
-    
-    _upload_run_files(agent_run)
+
+    try:
+        _upload_run_files(agent_run)
+    except Exception as exc:
+        agent_run.logger.error(f"Exception while uploading run files", exc_info=exc)
 
     time_taken = agent_run.end_time.timestamp() - agent_run.start_time.timestamp()
     agent_run.logger.info(f"Container finished in {time_taken:.2f} seconds")
 
-    # TODO: remove and find better solution
-    # Problem is that LiteLLM proxy doesn't instantly have the logs available via the API,
-    #   so the LLM statistics are incomplete if done directly
-    from time import sleep
-    sleep(10)
-    
-    llm_stats = litellmmgr.get_run_llm_statistics(agent_run)
-    agent_run.set_llm_statistics(llm_stats)
+    # LiteLLM proxy doesn't instantly have the logs available via the API,
+    #   so the LLM statistics are incomplete if done too soon after finishing the run, 
+    #   hence a delay
+    # This runs in its own OS thread, so time.sleep is fine
+    time.sleep(LITELLM_DATA_FETCH_DELAY)
+
+    try:
+        llm_stats = litellmmgr.get_run_llm_statistics(agent_run)
+        agent_run.set_llm_statistics(llm_stats)
+    except:
+        agent_run.logger.error(f"Exception while fetching LLM statistics for run {agent_run.id}", exc_info=True)
 
 def _extract_submitted_flag(agent_run: AgentRun):
     """

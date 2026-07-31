@@ -1,6 +1,6 @@
 import requests
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from .models import AgentRun, AgentRunLLMStatistics
 
@@ -27,7 +27,7 @@ def get_run_llm_statistics(run: "AgentRun") -> "AgentRunLLMStatistics":
     """
     key_alias = get_key_alias_for_run(run)
     start_date = run.start_time
-    end_date = datetime(2099, 12, 31)
+    end_date = run.start_time + timedelta(days=999) # must provide a start and end date, this should cover the end date
     
     start_date_f = start_date.strftime("%Y-%m-%d %H:%M:%S").replace(" ", "%20")
     end_date_f = end_date.strftime("%Y-%m-%d %H:%M:%S").replace(" ", "%20")

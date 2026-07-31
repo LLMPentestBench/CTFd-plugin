@@ -55,6 +55,13 @@ def process(agent_run):
     except Exception as exc:
         agent_run.logger.error(f"Exception while monitoring run", exc_info=exc)
         agent_run.mark_errored()
+        # Don't exit: we should still finalize the run.
+
+    try:
+        _finalize_run(agent_run)
+    except Exception as exc:
+        agent_run.logger.error(f"Exception while finalizing run", exc_info=exc)
+        agent_run.mark_errored()
         return
 
     if benchmark:
@@ -250,51 +257,52 @@ def _monitor_run_container(sock, agent_run: AgentRun, time_limit: int):
     run_folder = agent_run.get_folder()
     log_file_path = f"{run_folder}/output.log"
 
-    try:
-        @utils.wrap_app_context
-        def heartbeat_loop():
-            agent_run = AgentRun.query.get(run_id)
+    @utils.wrap_app_context
+    def heartbeat_loop():
+        agent_run = AgentRun.query.get(run_id)
+        
+        while True:
+            agent_run.heartbeat()
+            agent_run.logger.debug(f"Sent heartbeat")
             
-            while True:
-                agent_run.heartbeat()
-                agent_run.logger.debug(f"Sent heartbeat")
-                
-                gevent.sleep(AGENT_RUN_HEARTBEAT_INTERVAL)
+            gevent.sleep(AGENT_RUN_HEARTBEAT_INTERVAL)
 
-        @utils.wrap_app_context
-        def timeout_killer():
-            agent_run = AgentRun.query.get(run_id)
-            
-            gevent.sleep(time_limit)
-            
-            agent_run.logger.warning("Run timed out, stopping container")
-            agent_run.mark_timed_out()
-            try:
-                _stop_run(agent_run)
-            except Exception:
-                agent_run.logger.error(f"Exception while stopping run after timeout", exc_info=True)
-
-        heartbeat_greenlet = gevent.spawn(heartbeat_loop)
-        timeout_greenlet = gevent.spawn(timeout_killer)
-
+    @utils.wrap_app_context
+    def timeout_killer():
+        agent_run = AgentRun.query.get(run_id)
+        
+        gevent.sleep(time_limit)
+        
+        agent_run.logger.warning("Run timed out, stopping container")
+        agent_run.mark_timed_out()
         try:
-            utils.stream_socket_to_file(sock, log_file_path)
-            # TODO: this above call will exit during the _stop_run execution, causing race condition
-        finally:
-            heartbeat_greenlet.kill()
-            timeout_greenlet.kill()
-            sock.close()
-    finally:
-        _stop_run(agent_run)
+            _stop_run(agent_run)
+        except Exception:
+            agent_run.logger.error(f"Exception while stopping run after timeout", exc_info=True)
 
-        litellmmgr.delete_key_for_run(agent_run)
+    heartbeat_greenlet = gevent.spawn(heartbeat_loop)
+    timeout_greenlet = gevent.spawn(timeout_killer)
+
+    try:
+        utils.stream_socket_to_file(sock, log_file_path)
+        # TODO: this above call will exit during the _stop_run execution, causing race condition
+    finally:
+        heartbeat_greenlet.kill()
+        timeout_greenlet.kill()
+        sock.close()
+
+def _finalize_run(agent_run: AgentRun):
+    _stop_run(agent_run) # stop if not stopped already
+    
+    litellmmgr.delete_key_for_run(agent_run)
 
     db.session.refresh(agent_run)
 
-    if agent_run.status == AgentRunStatus.STOPPED:
-        # If stopped, simply exit
+    if agent_run.status in [AgentRunStatus.STOPPED, AgentRunStatus.ERRORED, AgentRunStatus.ZOMBIE]:
+        # If stopped, errored or zombie, simply exit
         return
     elif agent_run.status not in [AgentRunStatus.RUNNING, AgentRunStatus.TIMED_OUT]:
+        # Even if timed out still check for flag
         raise Exception(f"Run finished with unexpected status {agent_run.status}")
 
     agent_run.logger.info(f"Finished monitoring container")
@@ -305,20 +313,20 @@ def _monitor_run_container(sock, agent_run: AgentRun, time_limit: int):
         _scan_output_for_flag(agent_run)
     else:
         _extract_submitted_flag(agent_run)
-
-    # TODO: remove and find better solution
-    # Problem is that LiteLLM proxy doesn't instantly have the logs available via the API,
-    #   so the LLM statistics are incomplete if done directly
-    from time import sleep
-    sleep(5)
-    
-    llm_stats = litellmmgr.get_run_llm_statistics(agent_run)
-    agent_run.set_llm_statistics(llm_stats)
     
     _upload_run_files(agent_run)
 
     time_taken = agent_run.end_time.timestamp() - agent_run.start_time.timestamp()
     agent_run.logger.info(f"Container finished in {time_taken:.2f} seconds")
+
+    # TODO: remove and find better solution
+    # Problem is that LiteLLM proxy doesn't instantly have the logs available via the API,
+    #   so the LLM statistics are incomplete if done directly
+    from time import sleep
+    sleep(10)
+    
+    llm_stats = litellmmgr.get_run_llm_statistics(agent_run)
+    agent_run.set_llm_statistics(llm_stats)
 
 def _extract_submitted_flag(agent_run: AgentRun):
     """
@@ -367,6 +375,10 @@ def _stop_run(agent_run: AgentRun):
         try:
             container = get_docker_client().containers.get(container_name)
         except docker.errors.NotFound:
+            return
+
+        if container.status != "running":
+            agent_run.logger.info(f"Container is not running (status: {container.status}), no need to stop")
             return
 
         # TODO softer stopping for timeout?
@@ -434,11 +446,11 @@ def cleanup_containers():
                 logger.warning(f"Found leftover container named {container.name} with run_id {run_id} but no corresponding database entry, not cleaning up container")
                 continue
             # Only clean up zombie runs, to avoid possible concurrency issues with multiple workers
-            if agent_run.status == AgentRunStatus.RUNNING:
+            if agent_run.status != AgentRunStatus.ZOMBIE:
                 logger.warning(f"Found running leftover container named {container.name} for run {run_id} in status {agent_run.status}, not cleaning up container")
                 continue
 
-            container.remove(force=True)
+            _finalize_run(agent_run) # call finalization to clean up other resources such as LiteLLM key
             logger.info(f"Cleaned up leftover container named {container.name} for run {run_id} ({container.id[:12]})")
         except Exception as exc:
             logger.error(f"Exception while cleaning up leftover container named {container.name} for run {run_id} ({container.id[:12]})", exc_info=exc)

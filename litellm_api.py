@@ -10,7 +10,7 @@ EMBEDDER_MODEL_NAME = "openai-text-embedding-3-small"
 
 LITELLM_SPEND_LOGS_FETCH_PAGE_SIZE = 100 # max 100
 
-logger = logging.getLogger("llmpentestbench.litellmmgr")
+logger = logging.getLogger("llmpentestbench.litellm_api")
 
 def get_key_alias_for_run(run: AgentRun) -> str:
     """

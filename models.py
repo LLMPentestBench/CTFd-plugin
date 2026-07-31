@@ -2,6 +2,7 @@ from dataclasses import dataclass
 import enum
 import os
 import datetime
+import logging
 
 from CTFd.models import Challenges, Files, db
 
@@ -166,8 +167,7 @@ class AgentRun(db.Model):
     
     @property
     def logger(self):
-        from .runmgr import logger
-        return logger.getChild(f"run_{self.id:04d}")
+        return logging.getLogger(f"llmpentestbench.runner.run_{self.id}")
 
     @property
     def duration(self) -> datetime.timedelta | None:

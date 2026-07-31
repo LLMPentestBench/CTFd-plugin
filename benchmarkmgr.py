@@ -2,11 +2,11 @@ import logging
 
 from CTFd.models import db, Challenges
 
-from . import runmgr, scaffoldmgr
+from . import runner
 from .scaffoldmgr import Scaffold
 from .models import Benchmark, BenchmarkModel, BenchmarkScaffold
 
-logger = logging.getLogger("llmpentestbench.benchmarkmgr")
+logger = logging.getLogger("llmpentestbench.benchmark")
 
 def create_benchmark(
     display_name: str,
@@ -48,5 +48,5 @@ def queue_benchmark_runs(benchmark: Benchmark):
     for scaffold in benchmark.scaffolds:
         for challenge in benchmark.challenges:
             for model in benchmark.models:
-                runmgr.queue_run(scaffold, challenge, model,
+                runner.queue_run(scaffold, challenge, model,
                                 benchmark=benchmark, benchmark_attempt=1)

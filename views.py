@@ -8,7 +8,7 @@ from CTFd.utils.decorators import admins_only, authed_only
 from CTFd.plugins import register_plugin_assets_directory, register_user_page_menu_bar
 from CTFd.models import Challenges
 
-from . import scaffoldmgr, runmgr, challmgr, benchmarkmgr, litellmmgr
+from . import benchmarkmgr, chall, litellm_api, runner, scaffoldmgr
 from .models import AgentRun, Benchmark
 
 logger = logging.getLogger("llmpentestbench.views")
@@ -57,7 +57,7 @@ def view_create_benchmark():
     if request.method == "GET":
         scaffolds = scaffoldmgr.get_scaffolds()
         challenges = Challenges.query.all()
-        models = litellmmgr.list_models()
+        models = litellm_api.list_models()
 
         return render_template('llmpentestbench/admin/create_benchmark.html', scaffolds=scaffolds, challenges=challenges, models=models)
     elif request.method == "POST":
@@ -98,7 +98,7 @@ def view_create_benchmark():
         if len(challenges) != len(challenge_ids):
             return {"success": False, "error": "One or more challenge IDs do not exist"}, 400
 
-        available_models = set(litellmmgr.list_models())
+        available_models = set(litellm_api.list_models())
         if any(model not in available_models for model in model_names):
             return {"success": False, "error": "One or more model names do not exist"}, 400
 
@@ -130,7 +130,7 @@ def stop_run(run_id):
     run = AgentRun.query.filter_by(id=run_id).first_or_404()
 
     try:
-        runmgr.user_stop_run(run)
+        runner.user_stop_run(run)
         return {"success": True}
     except Exception as e:
         logger.error(f"Error stopping run {run_id}", exc_info=e)
@@ -151,9 +151,9 @@ def run_challenge(scaffold_id):
         return {"success": False, "error": f"Challenge with id {challenge_id} does not exist"}, 400
 
     try:
-        challmgr.validate_challenge(challenge)
+        chall.validate_challenge(challenge)
 
-        runmgr.queue_run(scaffold, challenge, model)
+        runner.queue_run(scaffold, challenge, model)
         return {"success": True}
     except Exception as e:
         logger.error(f"Error starting run for scaffold {scaffold_id}", exc_info=e)

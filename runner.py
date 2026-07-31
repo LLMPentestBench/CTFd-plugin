@@ -11,7 +11,7 @@ import docker
 from CTFd.models import db, Challenges
 from CTFd.utils.uploads import get_uploader, hash_file
 
-from . import utils, challmgr, litellmmgr
+from . import chall, litellm_api, utils
 from .models import AGENT_RUN_HEARTBEAT_INTERVAL, AgentRun, AgentRunStatus, AgentRunFiles, Benchmark
 from .scaffoldmgr import Scaffold
 from .utils import get_docker_client
@@ -25,7 +25,7 @@ CONTAINER_INITIALIZATION_TIMEOUT = 60 # seconds
 TERMINAL_COLUMNS = 132
 TERMINAL_ROWS = 24
 
-logger = logging.getLogger("llmpentestbench.runmgr")
+logger = logging.getLogger("llmpentestbench.runner")
 
 def _get_container_name(agent_run: AgentRun):
     return "llmptb_" + agent_run.scaffold_id + "_run_" + str(agent_run.id)
@@ -78,7 +78,7 @@ def process(agent_run):
 
 def queue_run(scaffold: Scaffold, challenge: Challenges, model: str,
               benchmark: Benchmark | None = None, benchmark_attempt: int | None = None) -> AgentRun:
-    challmgr.validate_challenge(challenge) # validate that challenge has flags and the flags are in proper format
+    chall.validate_challenge(challenge) # validate that challenge has flags and the flags are in proper format
     if (benchmark is None and benchmark_attempt is not None) or (benchmark is not None and benchmark_attempt is None):
         raise Exception("Both benchmark and benchmark_attempt must be provided together, or neither")
 
@@ -180,7 +180,7 @@ def _initialize_run_container(agent_run: AgentRun):
     return sock
 
 def set_container_llm_key(container, agent_run: AgentRun):
-    llm_key = litellmmgr.create_key_for_run(agent_run)
+    llm_key = litellm_api.create_key_for_run(agent_run)
 
     command = agent_run.scaffold.set_llm_key_command(llm_key)
     exit_code, output = container.exec_run(command)
@@ -221,7 +221,7 @@ def _write_challenge_details(folder, challenge) -> str:
     description = challenge.description
     category = challenge.category
     connection_info = challenge.connection_info
-    flag_format = challmgr.extract_flag_format(challenge)
+    flag_format = chall.extract_flag_format(challenge)
 
     # Get files from file storage (local / S3), and write to challenge files folder
     files_folder = f"{folder}/files"
@@ -300,7 +300,7 @@ def _finalize_run(agent_run: AgentRun):
     """
     _stop_run(agent_run) # stop if not stopped already
     
-    litellmmgr.delete_key_for_run(agent_run)
+    litellm_api.delete_key_for_run(agent_run)
 
     db.session.refresh(agent_run)
 
@@ -335,7 +335,7 @@ def _finalize_run(agent_run: AgentRun):
     time.sleep(LITELLM_DATA_FETCH_DELAY)
 
     try:
-        llm_stats = litellmmgr.get_run_llm_statistics(agent_run)
+        llm_stats = litellm_api.get_run_llm_statistics(agent_run)
         agent_run.set_llm_statistics(llm_stats)
     except:
         agent_run.logger.error(f"Exception while fetching LLM statistics for run {agent_run.id}", exc_info=True)
@@ -353,7 +353,7 @@ def _extract_submitted_flag(agent_run: AgentRun):
     with open(file_path, "r") as f:
         submitted_flag = f.read().strip()
 
-    flag_correct = challmgr.check_flag(agent_run.challenge, submitted_flag)
+    flag_correct = chall.check_flag(agent_run.challenge, submitted_flag)
     agent_run.logger.info(f"Submitted flag `{submitted_flag}` is {'correct' if flag_correct else 'incorrect'}")
     agent_run.submit_flag(submitted_flag, flag_correct)
 
@@ -362,7 +362,7 @@ def _scan_output_for_flag(agent_run: AgentRun):
     Scan the output folder for any files that contain a flag in the expected format.
     If a flag is found, submit it for the run.
     """
-    flag_format = challmgr.extract_flag_format(agent_run.challenge)
+    flag_format = chall.extract_flag_format(agent_run.challenge)
 
     run_folder = agent_run.get_folder()
     log_file = f"{run_folder}/output.log"
@@ -377,7 +377,7 @@ def _scan_output_for_flag(agent_run: AgentRun):
         return
     
     chosen_match = matches[-1] # last mentioned match
-    flag_correct = challmgr.check_flag(agent_run.challenge, chosen_match)
+    flag_correct = chall.check_flag(agent_run.challenge, chosen_match)
     agent_run.logger.info(f"Found flag `{chosen_match}` in output, which is {'correct' if flag_correct else 'incorrect'}")
     agent_run.submit_flag(chosen_match, flag_correct)
 

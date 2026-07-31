@@ -205,6 +205,45 @@ def _wait_for_container_initialization(container, agent_run: AgentRun):
         f"Timed out waiting for systemd in run {agent_run.id}; last status: {last_output}"
     )
 
+def _write_challenge_details(folder, challenge) -> str:
+    """
+    Write the (limited) details of the CTFd challenge to a JSON file for the scaffold.
+    """
+    name = challenge.name
+    description = challenge.description
+    category = challenge.category
+    connection_info = challenge.connection_info
+    flag_format = challmgr.extract_flag_format(challenge)
+
+    # Get files from file storage (local / S3), and write to challenge files folder
+    files_folder = f"{folder}/files"
+    if challenge.files:
+        os.mkdir(files_folder)
+    
+    uploader = get_uploader()
+    file_names = []
+    for file in challenge.files:
+        file_name = file.location.split("/")[-1]
+
+        # Open file stream and write to the location in chunks
+        with uploader.open(file.location, "rb") as f: 
+            file_path = f"{files_folder}/{file_name}"
+            with open(file_path, "wb") as dst:
+                while chunk := f.read(1024*1024): # 1MB chunks
+                    dst.write(chunk)
+        
+        file_names.append(file_name)
+    
+    with open(f"{folder}/challenge.json", "w") as f:
+        json.dump({
+            "name": name,
+            "description": description,
+            "category": category,
+            "connection_info": connection_info,
+            "flag_format": flag_format,
+            "files": file_names,
+        }, f, indent=4)
+
 def _monitor_run_container(sock, agent_run: AgentRun, time_limit: int):
     run_id = agent_run.id
 
@@ -280,45 +319,6 @@ def _monitor_run_container(sock, agent_run: AgentRun, time_limit: int):
 
     time_taken = agent_run.end_time.timestamp() - agent_run.start_time.timestamp()
     agent_run.logger.info(f"Container finished in {time_taken:.2f} seconds")
-
-def _write_challenge_details(folder, challenge) -> str:
-    """
-    Write the (limited) details of the CTFd challenge to a JSON file for the scaffold.
-    """
-    name = challenge.name
-    description = challenge.description
-    category = challenge.category
-    connection_info = challenge.connection_info
-    flag_format = challmgr.extract_flag_format(challenge)
-
-    # Get files from file storage (local / S3), and write to challenge files folder
-    files_folder = f"{folder}/files"
-    if challenge.files:
-        os.mkdir(files_folder)
-    
-    uploader = get_uploader()
-    file_names = []
-    for file in challenge.files:
-        file_name = file.location.split("/")[-1]
-
-        # Open file stream and write to the location in chunks
-        with uploader.open(file.location, "rb") as f: 
-            file_path = f"{files_folder}/{file_name}"
-            with open(file_path, "wb") as dst:
-                while chunk := f.read(1024*1024): # 1MB chunks
-                    dst.write(chunk)
-        
-        file_names.append(file_name)
-    
-    with open(f"{folder}/challenge.json", "w") as f:
-        json.dump({
-            "name": name,
-            "description": description,
-            "category": category,
-            "connection_info": connection_info,
-            "flag_format": flag_format,
-            "files": file_names,
-        }, f, indent=4)
 
 def _extract_submitted_flag(agent_run: AgentRun):
     """

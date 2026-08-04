@@ -58,8 +58,8 @@ def get_run_llm_statistics(run: "AgentRun") -> "AgentRunLLMStatistics":
             total_spend += entry.get("spend", 0)
             total_prompt_tokens += entry.get("prompt_tokens", 0)
             total_completion_tokens += entry.get("completion_tokens", 0)
-            
-            if entry.get("status") == "failed":
+
+            if entry.get("status") == "failure":
                 calls_failed += 1
 
             end_time = datetime.fromisoformat(entry.get("endTime"))

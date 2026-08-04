@@ -18,7 +18,7 @@ def extract_flag_format(challenge: Challenges) -> str:
     - Must be in format `PREFIX{SECRET}`
     - The secret part of the flag must have at least 6 characters
 
-    For example, a challenge with flag `CTF{My_s3cr3t_Fl@g}` returns `CTF{[^}]{6,}}`.
+    For example, a challenge with flag `CTF{My_s3cr3t_Fl@g}` returns `CTF{[^}]{14}}`.
     """
     if len(challenge.flags) != 1 or challenge.flags[0].type != CTFdStaticFlag.name:
         raise ValueError(f"Challenge {challenge.id} must have exactly one static flag")
@@ -35,8 +35,8 @@ def extract_flag_format(challenge: Challenges) -> str:
     if len(secret) < 6:
         raise ValueError("Flag secret is too short, should be at least 6 characters")
 
-    # return regex pattern with prefix and a >6 character secret
-    return f"{prefix}\\{{[^}}]{{6,}}\\}}"
+    # return regex pattern with prefix and a secret of the correct length
+    return f"{prefix}\\{{[^}}]{{{len(secret)}}}\\}}"
 
 def validate_challenge(challenge):
     """

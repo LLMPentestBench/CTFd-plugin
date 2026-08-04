@@ -36,15 +36,6 @@ def view_config():
 def view_benchmark(benchmark_id):
     benchmark = Benchmark.query.filter_by(id=benchmark_id).first_or_404()
 
-    ordered_runs = sorted(
-        benchmark.runs,
-        key=lambda run: (
-            run.challenge_id,
-            run.scaffold_id,
-            run.benchmark_attempt
-        ),
-    )
-
     benchmark_payload = {
         "benchmark": {
             "id": benchmark.id,
@@ -70,23 +61,27 @@ def view_benchmark(benchmark_id):
                 "model": run.model,
                 "attempt": run.benchmark_attempt,
                 "status": run.status.value,
+                "submitted_flag": run.submitted_flag,
                 "flag_correct": run.flag_correct,
                 "duration_seconds": run.duration.total_seconds() if run.duration else None,
                 "duration_f": run.duration_f,
+                "creation_time": run.creation_time.isoformat(),
                 "start_time": run.start_time.isoformat() if run.start_time else None,
                 "end_time": run.end_time.isoformat() if run.end_time else None,
                 "llm_total_spend": run.llm_total_spend,
                 "llm_calls_total": run.llm_calls_total,
                 "llm_calls_failed": run.llm_calls_failed,
+                "llm_total_prompt_tokens": run.llm_total_prompt_tokens,
+                "llm_total_completion_tokens": run.llm_total_completion_tokens,
+                "llm_total_time": run.llm_total_time,
             }
-            for run in ordered_runs
+            for run in benchmark.runs
         ],
     }
 
     return render_template(
         'llmpentestbench/admin/benchmark.html',
         benchmark=benchmark,
-        ordered_runs=ordered_runs,
         benchmark_payload=benchmark_payload,
     )
 

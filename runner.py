@@ -143,7 +143,6 @@ def _initialize_run_container(agent_run: AgentRun):
                 "mode": "rw",
             }
         },
-        remove=True, # TODO remove and do manual cleanup, see also _stop_run
     )
     agent_run.logger.info(f"Container ({container.id[:12]}) started, waiting for container readiness")
 
@@ -397,7 +396,7 @@ def _stop_run(agent_run: AgentRun):
 
         # TODO softer stopping for timeout?
         container.stop(timeout=0)
-        # container.remove(force=True) # TODO add back when remove=True is gone
+        container.remove(force=True)
         agent_run.logger.info(f"Container stopped")
     except Exception as exc:
         agent_run.logger.error(f"Exception while stopping run", exc_info=exc)

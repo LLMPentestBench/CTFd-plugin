@@ -26,12 +26,12 @@ blueprint = Blueprint(
 
 @blueprint.route('/admin/llmpentestbench')
 @admins_only
-def view_config():
+def view_main():
     scaffolds = scaffoldmgr.get_scaffolds()
     standalone_runs = AgentRun.query.filter(AgentRun.benchmark == None).order_by(AgentRun.creation_time.desc()).all()
     benchmarks = Benchmark.query.order_by(Benchmark.creation_time.desc()).all()
 
-    return render_template('llmpentestbench/admin/config.html', scaffolds=scaffolds, standalone_runs=standalone_runs, benchmarks=benchmarks)
+    return render_template('llmpentestbench/admin/main.html', scaffolds=scaffolds, standalone_runs=standalone_runs, benchmarks=benchmarks)
 
 @blueprint.route('/admin/llmpentestbench/create_benchmark', methods=["GET", "POST"])
 @admins_only
@@ -219,14 +219,8 @@ def get_logs_stream(run_id):
 
     return Response(gen(), mimetype="text/event-stream")
 
-@authed_only
-@blueprint.route('/llmpentestbench')
-def view_llmpentestbench():
-    return render_template('llmpentestbench/user/view.html')
-
 def load(app: CTFdFlask):
     app.register_blueprint(blueprint)
     register_plugin_assets_directory(app,
                                      base_path="/plugins/llmpentestbench/assets",
                                      endpoint="plugins.llmpentestbench.assets")
-    register_user_page_menu_bar("LLMPentestBench", "/llmpentestbench")

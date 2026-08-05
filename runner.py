@@ -287,7 +287,6 @@ def _monitor_run_container(sock, agent_run: AgentRun, time_limit: int):
 
     try:
         utils.stream_socket_to_file(sock, log_file_path)
-        # TODO: this above call will exit during the _stop_run execution, causing race condition
     finally:
         heartbeat_greenlet.kill()
         timeout_greenlet.kill()
@@ -299,11 +298,13 @@ def _finalize_run(agent_run: AgentRun):
 
     Keep in mind that this function may delay due to I/O operations.
     """
-    _stop_run(agent_run) # stop if not stopped already
-    
-    litellm_api.delete_key_for_run(agent_run)
-
     db.session.refresh(agent_run)
+
+    # Stop if not stopped already
+    if agent_run.status != AgentRunStatus.STOPPED:
+        _stop_run(agent_run)
+
+    litellm_api.delete_key_for_run(agent_run)
 
     if agent_run.status in [AgentRunStatus.STOPPED, AgentRunStatus.ERRORED, AgentRunStatus.ZOMBIE]:
         # If stopped, errored or zombie, simply exit

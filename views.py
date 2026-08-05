@@ -1,5 +1,7 @@
 import base64
 import logging
+import io
+import csv
 
 from flask import Blueprint, render_template, Response, request, stream_with_context, url_for
 
@@ -30,60 +32,6 @@ def view_config():
     benchmarks = Benchmark.query.order_by(Benchmark.creation_time.desc()).all()
 
     return render_template('llmpentestbench/admin/config.html', scaffolds=scaffolds, standalone_runs=standalone_runs, benchmarks=benchmarks)
-
-@blueprint.route('/admin/llmpentestbench/benchmark/<benchmark_id>')
-@admins_only
-def view_benchmark(benchmark_id):
-    benchmark = Benchmark.query.filter_by(id=benchmark_id).first_or_404()
-
-    benchmark_payload = {
-        "benchmark": {
-            "id": benchmark.id,
-            "display_name": benchmark.display_name,
-            "attempts": benchmark.attempts,
-            "stop_after_first_success": benchmark.stop_after_first_success,
-            "time_limit": benchmark.time_limit,
-        },
-        "challenges": [
-            {
-                "id": challenge.id,
-                "name": challenge.name,
-            }
-            for challenge in benchmark.challenges
-        ],
-        "runs": [
-            {
-                "id": run.id,
-                "challenge_id": run.challenge_id,
-                "challenge_name": run.challenge.name if run.challenge else None,
-                "scaffold_id": run.scaffold_id,
-                "scaffold_name": run.scaffold.name if run.scaffold else run.scaffold_id,
-                "model": run.model,
-                "attempt": run.benchmark_attempt,
-                "status": run.status.value,
-                "submitted_flag": run.submitted_flag,
-                "flag_correct": run.flag_correct,
-                "duration_seconds": run.duration.total_seconds() if run.duration else None,
-                "duration_f": run.duration_f,
-                "creation_time": run.creation_time.isoformat(),
-                "start_time": run.start_time.isoformat() if run.start_time else None,
-                "end_time": run.end_time.isoformat() if run.end_time else None,
-                "llm_total_spend": run.llm_total_spend,
-                "llm_calls_total": run.llm_calls_total,
-                "llm_calls_failed": run.llm_calls_failed,
-                "llm_total_prompt_tokens": run.llm_total_prompt_tokens,
-                "llm_total_completion_tokens": run.llm_total_completion_tokens,
-                "llm_total_time": run.llm_total_time,
-            }
-            for run in benchmark.runs
-        ],
-    }
-
-    return render_template(
-        'llmpentestbench/admin/benchmark.html',
-        benchmark=benchmark,
-        benchmark_payload=benchmark_payload,
-    )
 
 @blueprint.route('/admin/llmpentestbench/create_benchmark', methods=["GET", "POST"])
 @admins_only
@@ -143,6 +91,62 @@ def view_create_benchmark():
         benchmarkmgr.create_benchmark(display_name, scaffolds, challenges, model_names, attempts, stop_after_first_success, time_limit)
 
         return {"success": True}
+
+@blueprint.route('/admin/llmpentestbench/benchmark/<benchmark_id>')
+@admins_only
+def view_benchmark(benchmark_id):
+    benchmark = Benchmark.query.filter_by(id=benchmark_id).first_or_404()
+
+    benchmark_payload = {
+        "benchmark": {
+            "id": benchmark.id,
+            "display_name": benchmark.display_name,
+            "attempts": benchmark.attempts,
+            "stop_after_first_success": benchmark.stop_after_first_success,
+            "time_limit": benchmark.time_limit,
+        },
+        "challenges": [
+            {
+                "id": challenge.id,
+                "name": challenge.name,
+            }
+            for challenge in benchmark.challenges
+        ],
+        "runs": [
+            run.to_dict()
+            for run in benchmark.runs
+        ],
+    }
+
+    return render_template(
+        'llmpentestbench/admin/benchmark.html',
+        benchmark=benchmark,
+        benchmark_payload=benchmark_payload,
+    )
+
+@blueprint.route('/admin/llmpentestbench/benchmark/<benchmark_id>/export_scores')
+@admins_only
+def export_benchmark_scores(benchmark_id):
+    benchmark = Benchmark.query.filter_by(id=benchmark_id).first_or_404()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    wrote_headers = False
+    for run in benchmark.runs:
+        dict_run = run.to_dict()
+        if not wrote_headers:
+            writer.writerow(dict_run.keys())
+            wrote_headers = True
+
+        writer.writerow(dict_run.values())
+
+    output.seek(0)
+    return Response(
+        output,
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment;filename=benchmark_{benchmark_id}_scores.csv"}
+    )
 
 @blueprint.route('/admin/llmpentestbench/run/<run_id>')
 @admins_only

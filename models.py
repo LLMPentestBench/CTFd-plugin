@@ -185,6 +185,31 @@ class AgentRun(db.Model):
         milliseconds = int(self.duration.microseconds / 1000)
         return f"{hours:02}:{minutes:02}:{seconds:02}.{milliseconds:03}"
 
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "challenge_id": self.challenge_id,
+            "challenge_name": self.challenge.name if self.challenge else None,
+            "scaffold_id": self.scaffold_id,
+            "scaffold_name": self.scaffold.name if self.scaffold else self.scaffold_id,
+            "model": self.model,
+            "attempt": self.benchmark_attempt,
+            "status": self.status.value,
+            "submitted_flag": self.submitted_flag,
+            "flag_correct": self.flag_correct,
+            "duration_seconds": self.duration.total_seconds() if self.duration else None,
+            "duration_f": self.duration_f,
+            "creation_time": self.creation_time.isoformat(),
+            "start_time": self.start_time.isoformat() if self.start_time else None,
+            "end_time": self.end_time.isoformat() if self.end_time else None,
+            "llm_total_spend": self.llm_total_spend,
+            "llm_calls_total": self.llm_calls_total,
+            "llm_calls_failed": self.llm_calls_failed,
+            "llm_total_prompt_tokens": self.llm_total_prompt_tokens,
+            "llm_total_completion_tokens": self.llm_total_completion_tokens,
+            "llm_total_time": self.llm_total_time,
+        }
+
 class AgentRunFiles(Files):
     # Give this its own table, to avoid having to edit the CTFd Files table columns
     __tablename__ = "llmptb_agent_run_files"

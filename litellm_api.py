@@ -2,11 +2,12 @@ import requests
 import logging
 from datetime import datetime, timedelta
 
+from .config import CONFIG
 from .models import AgentRun, AgentRunLLMStatistics
 
-LITELLM_HOST = "http://localhost:4000"
-LITELLM_KEY = "sk-M7lSa-wbdMaT6VtYLZYldQ" # TODO not hardcoded
-EMBEDDER_MODEL_NAME = "openai-text-embedding-3-small"
+LITELLM_HOST = CONFIG.litellm.host
+LITELLM_KEY = CONFIG.litellm.key
+EMBEDDER_MODEL_NAME = CONFIG.litellm.embedder_model
 
 LITELLM_SPEND_LOGS_FETCH_PAGE_SIZE = 100 # max 100
 

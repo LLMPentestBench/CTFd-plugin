@@ -11,17 +11,18 @@ import docker
 from CTFd.models import db, Challenges
 from CTFd.utils.uploads import get_uploader, hash_file
 
+from .config import CONFIG
 from . import chall, litellm_api, utils
 from .models import AGENT_RUN_HEARTBEAT_INTERVAL, AgentRun, AgentRunStatus, AgentRunFiles, Benchmark
 from .scaffoldmgr import Scaffold
 from .utils import get_docker_client
 
-DOCKER_RUNTIME = "sysbox-runc"
-DOCKER_NETWORK = "llmptb_proxynet"
-LITELLM_DATA_FETCH_DELAY = 10 # seconds
+DOCKER_RUNTIME = CONFIG.runner.docker_sysbox_runtime
+DOCKER_NETWORK = CONFIG.runner.docker_network
+LITELLM_DATA_FETCH_DELAY = CONFIG.runner.litellm_data_fetch_delay # seconds
+CONTAINER_INITIALIZATION_TIMEOUT = CONFIG.runner.container_initialization_timeout # seconds
 
-DEFAULT_RUN_TIMEOUT = 300 # seconds
-CONTAINER_INITIALIZATION_TIMEOUT = 60 # seconds
+STANDALONE_RUN_TIMEOUT = 300 # seconds
 TERMINAL_COLUMNS = 132
 TERMINAL_ROWS = 24
 
@@ -39,7 +40,7 @@ def process(agent_run):
         time_limit = benchmark.time_limit
         run_name = f"run #{agent_run.benchmark_attempt}"
     else:
-        time_limit = DEFAULT_RUN_TIMEOUT
+        time_limit = STANDALONE_RUN_TIMEOUT
         run_name = "run"
 
     agent_run.logger.info(f"Initializing {run_name} with scaffold `{scaffold.id}` for challenge {challenge.id}")

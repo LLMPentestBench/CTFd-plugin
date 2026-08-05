@@ -1,0 +1,13 @@
+# Abc
+
+[litellm]
+host = "http://localhost:4000"
+key = "sk-M7lSa-wbdMaT6VtYLZYldQ"
+embedder_model = "openai-text-embedding-3-small"
+
+[runner]
+max_simultaneous_runs = 1
+docker_sysbox_runtime = "sysbox-runc"
+docker_network = "llmptb_proxynet"
+container_initialization_timeout = 60 # seconds
+litellm_data_fetch_delay = 10 # seconds

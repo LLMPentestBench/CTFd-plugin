@@ -200,15 +200,17 @@ def run_challenge(scaffold_id):
 @blueprint.route('/api/v1/plugins/llmpentestbench/run/<run_id>/log_stream', methods=["GET"])
 @admins_only
 def get_logs_stream(run_id):
+    # TODO look into better file wathcing (watchdog, inotify) or select(ors)
+    # TODO also stop stream when run is finished
+    # TODO fix issue with stream being closed, likely caused by sleep statement, introduce keep-alive msgs to fix
+    # TODO fix error thrown when run has not yet started and output.log doesnt exist yet.
+
     run = AgentRun.query.filter_by(id=run_id).first_or_404()
 
     @stream_with_context
     def gen():
         with open(f"{run.get_folder()}/output.log", "rb") as log_file:
             while True:
-                # TODO look into better file wathcing (watchdog, inotify) or select(ors)
-                # TODO also stop when run is finished
-                # TODO fix issue with stream being closed, likely caused by sleep statement, introduce keep-alive msgs to fix
                 data = log_file.read(2048)
                 data_encoded = base64.b64encode(data).decode('utf-8')
                 if data:

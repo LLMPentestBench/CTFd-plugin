@@ -27,7 +27,7 @@ class BlacksmithAI(Scaffold):
     def set_llm_key_command(self, llm_key: str) -> str:
         return f"/root/set_key.sh {llm_key}"
 
-    def get_command(self, challenge) -> list[str]:
+    def get_command(self, challenge) -> str:
         prompt = _build_prompt(challenge)
         return f"cd /root/blacksmith/blacksmithAI && uv run main.py {shlex.quote(prompt)}"
 

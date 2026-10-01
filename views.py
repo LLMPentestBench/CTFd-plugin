@@ -51,6 +51,7 @@ def view_create_benchmark():
         attempts = data.get("attempts")
         stop_after_first_success = data.get("stop_after_first_success")
         time_limit = data.get("time_limit")
+        internet_access = data.get("internet_access", False)
 
         if not scaffold_ids or not isinstance(scaffold_ids, list) or not all(isinstance(sid, str) for sid in scaffold_ids):
             return {"success": False, "error": "Invalid scaffold IDs"}, 400
@@ -74,6 +75,9 @@ def view_create_benchmark():
 
         if not isinstance(time_limit, int) or time_limit < 1:
             return {"success": False, "error": "Invalid time limit"}, 400
+
+        if not isinstance(internet_access, bool):
+            return {"success": False, "error": "Invalid internet access value"}, 400
         
         scaffolds = [scaffoldmgr.get_scaffold(sid) for sid in scaffold_ids]
         challenges = Challenges.query.filter(Challenges.id.in_(challenge_ids)).all()
@@ -85,10 +89,10 @@ def view_create_benchmark():
             return {"success": False, "error": "One or more model names do not exist"}, 400
 
         logger.info(
-            f"Received benchmark creation request (scaffolds={scaffold_ids}, challenges={challenge_ids}, models={model_names}, attempts={attempts}, stop_after_first_success={stop_after_first_success}, time_limit={time_limit})"
+            f"Received benchmark creation request (scaffolds={scaffold_ids}, challenges={challenge_ids}, models={model_names}, attempts={attempts}, stop_after_first_success={stop_after_first_success}, time_limit={time_limit}, internet_access={internet_access})"
         )
 
-        benchmarkmgr.create_benchmark(display_name, scaffolds, challenges, model_names, attempts, stop_after_first_success, time_limit)
+        benchmarkmgr.create_benchmark(display_name, scaffolds, challenges, model_names, attempts, stop_after_first_success, time_limit, internet_access)
 
         return {"success": True}
 
@@ -104,6 +108,7 @@ def view_benchmark(benchmark_id):
             "attempts": benchmark.attempts,
             "stop_after_first_success": benchmark.stop_after_first_success,
             "time_limit": benchmark.time_limit,
+            "internet_access": benchmark.internet_access,
         },
         "challenges": [
             {
@@ -183,6 +188,7 @@ def run_challenge(scaffold_id):
     
     challenge_id = "3"  # TODO: Replace with actual challenge selection logic
     model = "togetherai-minimax-m3"  # TODO: Replace with actual model selection logic
+    internet_access = True
 
     challenge = Challenges.query.filter_by(id=challenge_id).first()
     if not challenge:
@@ -191,7 +197,7 @@ def run_challenge(scaffold_id):
     try:
         chall.validate_challenge(challenge)
 
-        runner.queue_run(scaffold, challenge, model)
+        runner.queue_run(scaffold, challenge, model, internet_access)
         return {"success": True}
     except Exception as e:
         logger.error(f"Error starting run for scaffold {scaffold_id}", exc_info=e)

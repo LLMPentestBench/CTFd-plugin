@@ -16,12 +16,14 @@ def create_benchmark(
     attempts: int,
     stop_after_first_success: bool,
     time_limit: int,
+    internet_access: bool = False,
 ) -> Benchmark:
     benchmark = Benchmark(
         display_name=display_name,
         attempts=attempts,
         stop_after_first_success=stop_after_first_success,
         time_limit=time_limit,
+        internet_access=internet_access,
         benchmark_scaffolds=[
             BenchmarkScaffold(scaffold_id=scaffold.id) for scaffold in scaffolds
         ],
@@ -37,7 +39,7 @@ def create_benchmark(
         f"Created benchmark '{display_name}' with ID {benchmark.id}, "
         f"scaffolds {scaffolds}, challenges {challenges}, "
         f"attempts {attempts}, stop after first success {stop_after_first_success}, "
-        f"time limit {time_limit}"
+        f"time limit {time_limit}, internet access {internet_access}"
     )
 
     queue_benchmark_runs(benchmark)
@@ -48,5 +50,5 @@ def queue_benchmark_runs(benchmark: Benchmark):
     for scaffold in benchmark.scaffolds:
         for challenge in benchmark.challenges:
             for model in benchmark.models:
-                runner.queue_run(scaffold, challenge, model,
+                runner.queue_run(scaffold, challenge, model, benchmark.internet_access,
                                 benchmark=benchmark, benchmark_attempt=1)

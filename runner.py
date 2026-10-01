@@ -75,15 +75,15 @@ def process(agent_run):
             agent_run.logger.info(f"Benchmark {benchmark.id} is set to stop after first success, and {run_name} of scaffold {scaffold.id} and challenge {challenge.id} finished successfully, so skipping remaining attempts")
             return
 
-        queue_run(scaffold, challenge, model=agent_run.model, benchmark=benchmark, benchmark_attempt=agent_run.benchmark_attempt + 1)
+        queue_run(scaffold, challenge, model=agent_run.model, internet_access=agent_run.internet_access, benchmark=benchmark, benchmark_attempt=agent_run.benchmark_attempt + 1)
 
-def queue_run(scaffold: Scaffold, challenge: Challenges, model: str,
+def queue_run(scaffold: Scaffold, challenge: Challenges, model: str, internet_access: bool,
               benchmark: Benchmark | None = None, benchmark_attempt: int | None = None) -> AgentRun:
     chall.validate_challenge(challenge) # validate that challenge has flags and the flags are in proper format
     if (benchmark is None and benchmark_attempt is not None) or (benchmark is not None and benchmark_attempt is None):
         raise Exception("Both benchmark and benchmark_attempt must be provided together, or neither")
 
-    agent_run = AgentRun(scaffold_id=scaffold.id, challenge_id=challenge.id, model=model, status=AgentRunStatus.QUEUED)
+    agent_run = AgentRun(scaffold_id=scaffold.id, challenge_id=challenge.id, model=model, internet_access=internet_access, status=AgentRunStatus.QUEUED)
     if benchmark:
         if benchmark_attempt < 1 or benchmark_attempt > benchmark.attempts:
             raise Exception(f"Invalid benchmark_attempt {benchmark_attempt} for benchmark {benchmark.id} with {benchmark.attempts} attempts")
@@ -145,6 +145,8 @@ def _initialize_run_container(agent_run: AgentRun):
         },
         remove=True
     )
+    if agent_run.internet_access:
+        get_docker_client().networks.get(CONFIG.runner.docker_network_internet).connect(container)
     agent_run.logger.info(f"Container ({container.id[:12]}) started, waiting for container readiness")
 
     set_container_llm_key(container, agent_run)

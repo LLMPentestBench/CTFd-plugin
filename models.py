@@ -45,6 +45,7 @@ class AgentRun(db.Model):
     challenge_id = db.Column(db.Integer, db.ForeignKey("challenges.id"), nullable=False)
     scaffold_id = db.Column(db.String(64), nullable=False)
     model = db.Column(db.String(64), nullable=False)
+    internet_access = db.Column(db.Boolean, nullable=False)
     benchmark_id = db.Column(db.Integer, db.ForeignKey("llmptb_benchmarks.id"), nullable=True)
     benchmark_attempt = db.Column(db.Integer, nullable=True)
     # which attempt of the benchmark this run is for, starting at 1. cannot be null if benchmark_id is not null
@@ -72,10 +73,11 @@ class AgentRun(db.Model):
         "AgentRunFiles", backref="run", foreign_keys="AgentRunFiles.run_id", lazy="joined"
     )
 
-    def __init__(self, scaffold_id, challenge_id, model, status):
+    def __init__(self, scaffold_id, challenge_id, model, internet_access, status):
         self.scaffold_id = scaffold_id
         self.challenge_id = challenge_id
         self.model = model
+        self.internet_access = internet_access
         self._status = status
 
     @property
@@ -193,6 +195,7 @@ class AgentRun(db.Model):
             "scaffold_id": self.scaffold_id,
             "scaffold_name": self.scaffold.name if self.scaffold else self.scaffold_id,
             "model": self.model,
+            "internet_access": self.internet_access,
             "attempt": self.benchmark_attempt,
             "status": self.status.value,
             "submitted_flag": self.submitted_flag,
@@ -233,6 +236,7 @@ class Benchmark(db.Model):
     attempts = db.Column(db.Integer, nullable=False)
     stop_after_first_success = db.Column(db.Boolean, nullable=False)
     time_limit = db.Column(db.Integer, nullable=False) # seconds
+    internet_access = db.Column(db.Boolean, nullable=False, default=False)
 
     creation_time = db.Column(db.DateTime, nullable=False, default=datetime.datetime.utcnow)
 

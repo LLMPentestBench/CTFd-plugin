@@ -27,6 +27,7 @@ async function createBenchmark() {
     attempts: Number($("#attempts").val()),
     stop_after_first_success: $("input[name='stop_condition']:checked").val() === "first_success",
     time_limit: Number($("#time-limit").val()),
+    internet_access: $("#internet-access").prop("checked"),
   };
 
   if (payload.scaffolds.length === 0) {
@@ -80,6 +81,7 @@ $(".js-reset-benchmark-form").click((e) => {
   $("#attempts").val(1);
   $("#stop-first-success").prop("checked", true);
   $("#time-limit").val(60);
+  $("#internet-access").prop("checked", false);
   $(".js-create-benchmark-status").addClass("d-none").text("");
 });
 

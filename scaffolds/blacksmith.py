@@ -10,7 +10,7 @@ def _build_prompt(challenge):
     prompt += f"Description: `{challenge.description}`. "
     prompt += f"Category: `{challenge.category}`. "
     prompt += f"Connection info: `{challenge.connection_info}`. "
-    prompt += f"Do a very simple and basic test, keep it simple and short. Do not use any fancy tools."
+    prompt += f"Perform this test fully automatic and autonomous."
 
     return prompt
 

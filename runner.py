@@ -129,7 +129,7 @@ def _initialize_run_container(agent_run: AgentRun):
         internal=not agent_run.internet_access, # disallow internet access by making the network internal
     )
     # Connect containers to network to allow LLM requests
-    network.connect(CONFIG.runner.docker_container_litellm_name)
+    network.connect(CONFIG.runner.docker_container_litellm_name, aliases=["litellm"])
     network.connect(CONFIG.runner.docker_container_envoy_name, aliases=["api.openai.com", "llmproxy"])
 
     container_name = _get_container_name(agent_run)
@@ -318,6 +318,7 @@ def _finalize_run(agent_run: AgentRun):
     # Remove network
     network = get_docker_client().networks.get(_get_network_name(agent_run))
     for container in network.containers:
+        #TODO
         network.disconnect(container, force=True)
     network.remove()
 

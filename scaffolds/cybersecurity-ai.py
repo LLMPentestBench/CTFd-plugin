@@ -1,4 +1,5 @@
 import logging
+import shlex
 
 from ..scaffoldmgr import Scaffold
 
@@ -28,7 +29,7 @@ class CybersecurityAi(Scaffold):
 
     def get_command(self, challenge) -> list[str]:
         prompt = _build_prompt(challenge)
-        return ["cai", prompt]
+        return f"cai {shlex.quote(prompt)} && cp /root/logs/* /llmptb/output/"
 
 def load():
     return CybersecurityAi()

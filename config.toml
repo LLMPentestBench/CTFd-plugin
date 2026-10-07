@@ -8,7 +8,7 @@ embedder_model = "openai-text-embedding-3-small"
 [runner]
 max_simultaneous_runs = 1
 docker_sysbox_runtime = "sysbox-runc"
-docker_network = "llmptb_proxynet"
-docker_network_internet = "llmptb_proxynet_ext"
+docker_container_litellm_name = "llmptb_litellm"
+docker_container_envoy_name = "llmptb_envoy"
 container_initialization_timeout = 60 # seconds
 litellm_data_fetch_delay = 10 # seconds

@@ -18,7 +18,6 @@ from .scaffoldmgr import Scaffold
 from .utils import get_docker_client
 
 DOCKER_RUNTIME = CONFIG.runner.docker_sysbox_runtime
-DOCKER_NETWORK = CONFIG.runner.docker_network
 LITELLM_DATA_FETCH_DELAY = CONFIG.runner.litellm_data_fetch_delay # seconds
 CONTAINER_INITIALIZATION_TIMEOUT = CONFIG.runner.container_initialization_timeout # seconds
 
@@ -30,6 +29,9 @@ logger = logging.getLogger("llmpentestbench.runner")
 
 def _get_container_name(agent_run: AgentRun):
     return "llmptb_" + agent_run.scaffold_id + "_run_" + str(agent_run.id)
+
+def _get_network_name(agent_run: AgentRun):
+    return "llmptb_" + agent_run.scaffold_id + "_run_" + str(agent_run.id) + "_network"
 
 def process(agent_run):
     scaffold = agent_run.scaffold
@@ -121,6 +123,15 @@ def _initialize_run_container(agent_run: AgentRun):
     os.mkdir(run_input_folder)
     os.mkdir(run_output_folder)
 
+    network = get_docker_client().networks.create(
+        _get_network_name(agent_run),
+        driver="bridge",
+        internal=not agent_run.internet_access, # disallow internet access by making the network internal
+    )
+    # Connect containers to network to allow LLM requests
+    network.connect(CONFIG.runner.docker_container_litellm_name)
+    network.connect(CONFIG.runner.docker_container_envoy_name, aliases=["api.openai.com", "llmproxy"])
+
     container_name = _get_container_name(agent_run)
     container = get_docker_client().containers.run(
         scaffold.get_image_name(),
@@ -128,7 +139,7 @@ def _initialize_run_container(agent_run: AgentRun):
         tty=True,
         stdin_open=True,
         runtime=DOCKER_RUNTIME,
-        network=DOCKER_NETWORK,
+        network=network.name,
         name=container_name,
         labels={
             "llmptb_run": str(run_id),
@@ -145,8 +156,6 @@ def _initialize_run_container(agent_run: AgentRun):
         },
         remove=True
     )
-    if agent_run.internet_access:
-        get_docker_client().networks.get(CONFIG.runner.docker_network_internet).connect(container)
     agent_run.logger.info(f"Container ({container.id[:12]}) started, waiting for container readiness")
 
     set_container_llm_key(container, agent_run)
@@ -305,6 +314,12 @@ def _finalize_run(agent_run: AgentRun):
     # Stop if not stopped already
     if agent_run.status != AgentRunStatus.STOPPED:
         _stop_run(agent_run)
+
+    # Remove network
+    network = get_docker_client().networks.get(_get_network_name(agent_run))
+    for container in network.containers:
+        network.disconnect(container, force=True)
+    network.remove()
 
     litellm_api.delete_key_for_run(agent_run)
 

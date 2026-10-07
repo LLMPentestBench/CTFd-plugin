@@ -14,8 +14,8 @@ class LiteLLMConfig:
 class RunnerConfig:
     max_simultaneous_runs: int = 1
     docker_sysbox_runtime: str = "sysbox-runc"
-    docker_network: str = "llmptb_proxynet"
-    docker_network_internet: str = "ab"
+    docker_container_litellm_name: str = "llmptb_litellm"
+    docker_container_envoy_name: str = "llmptb_envoy"
     container_initialization_timeout: int = 60 # seconds
     litellm_data_fetch_delay: int = 10 # seconds
 
@@ -50,8 +50,8 @@ def load_config(config_path: Path = CONFIG_PATH) -> PluginConfig:
                 runner_config.get("max_simultaneous_runs", RunnerConfig.max_simultaneous_runs)
             ),
             docker_sysbox_runtime=runner_config.get("docker_sysbox_runtime", RunnerConfig.docker_sysbox_runtime),
-            docker_network=runner_config.get("docker_network", RunnerConfig.docker_network),
-            docker_network_internet=runner_config.get("docker_network_internet", RunnerConfig.docker_network_internet),
+            docker_container_litellm_name=runner_config.get("docker_container_litellm_name", RunnerConfig.docker_container_litellm_name),
+            docker_container_envoy_name=runner_config.get("docker_container_envoy_name", RunnerConfig.docker_container_envoy_name),
             container_initialization_timeout=int(
                 runner_config.get("container_initialization_timeout", RunnerConfig.container_initialization_timeout)
             ),

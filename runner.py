@@ -431,6 +431,9 @@ def _upload_run_files(agent_run: AgentRun):
 
             filename = path.name
             relpath = str(path.relative_to(folder))
+
+            if not agent_run.scaffold.use_output_flag_scanning() and relpath == "flag.txt":
+                continue
         
             with open(path, "rb") as f:
                 sha1sum = hash_file(fp=f)

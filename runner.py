@@ -48,36 +48,36 @@ def process(agent_run):
     agent_run.logger.info(f"Initializing {run_name} with scaffold `{scaffold.id}` for challenge {challenge.id}")
 
     try:
-        sock = _initialize_run_container(agent_run)
-    except Exception as exc:
-        agent_run.logger.error(f"Exception while initializing run", exc_info=exc)
-        agent_run.mark_errored()
-        return
-
-    try:
-        _monitor_run_container(sock, agent_run, time_limit=time_limit)
-    except Exception as exc:
-        agent_run.logger.error(f"Exception while monitoring run", exc_info=exc)
-        agent_run.mark_errored()
-        # Don't exit: we should still finalize the run.
-
-    try:
-        _finalize_run(agent_run)
-    except Exception as exc:
-        agent_run.logger.error(f"Exception while finalizing run", exc_info=exc)
-        agent_run.mark_errored()
-        return
-
-    if benchmark:
-        if agent_run.benchmark_attempt >= benchmark.attempts:
-            agent_run.logger.info(f"{run_name} is the last attempt for benchmark {benchmark.id}, no further attempts will be queued")
+        try:
+            sock = _initialize_run_container(agent_run)
+        except Exception as exc:
+            agent_run.logger.error(f"Exception while initializing run", exc_info=exc)
+            agent_run.mark_errored()
             return
 
-        if benchmark.stop_after_first_success and agent_run.flag_correct:
-            agent_run.logger.info(f"Benchmark {benchmark.id} is set to stop after first success, and {run_name} of scaffold {scaffold.id} and challenge {challenge.id} finished successfully, so skipping remaining attempts")
-            return
+        try:
+            _monitor_run_container(sock, agent_run, time_limit=time_limit)
+        except Exception as exc:
+            agent_run.logger.error(f"Exception while monitoring run", exc_info=exc)
+            agent_run.mark_errored()
+            # Don't exit: we should still finalize the run.
 
-        queue_run(scaffold, challenge, model=agent_run.model, internet_access=agent_run.internet_access, benchmark=benchmark, benchmark_attempt=agent_run.benchmark_attempt + 1)
+        try:
+            _finalize_run(agent_run)
+        except Exception as exc:
+            agent_run.logger.error(f"Exception while finalizing run", exc_info=exc)
+            agent_run.mark_errored()
+    finally:
+        if benchmark:
+            if agent_run.benchmark_attempt >= benchmark.attempts:
+                agent_run.logger.info(f"{run_name} is the last attempt for benchmark {benchmark.id}, no further attempts will be queued")
+                return
+
+            if benchmark.stop_after_first_success and agent_run.flag_correct:
+                agent_run.logger.info(f"Benchmark {benchmark.id} is set to stop after first success, and {run_name} of scaffold {scaffold.id} and challenge {challenge.id} finished successfully, so skipping remaining attempts")
+                return
+
+            queue_run(scaffold, challenge, model=agent_run.model, internet_access=agent_run.internet_access, benchmark=benchmark, benchmark_attempt=agent_run.benchmark_attempt + 1)
 
 def queue_run(scaffold: Scaffold, challenge: Challenges, model: str, internet_access: bool,
               benchmark: Benchmark | None = None, benchmark_attempt: int | None = None) -> AgentRun:

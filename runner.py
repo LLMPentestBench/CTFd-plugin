@@ -318,8 +318,10 @@ def _finalize_run(agent_run: AgentRun):
     # Remove network
     network = get_docker_client().networks.get(_get_network_name(agent_run))
     for container in network.containers:
-        #TODO
-        network.disconnect(container, force=True)
+        try:
+            network.disconnect(container, force=True)
+        except:
+            pass # may occur if container already marked for removal
     network.remove()
 
     litellm_api.delete_key_for_run(agent_run)
